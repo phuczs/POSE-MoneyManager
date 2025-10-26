@@ -21,10 +21,14 @@ class CategoryViewModel @Inject constructor(
     private val _categoriesState = MutableStateFlow<CategoriesState>(CategoriesState.Loading)
     val categoriesState: StateFlow<CategoriesState> = _categoriesState.asStateFlow()
     private val _groupedCategoriesState = MutableStateFlow<GroupedCategoriesState>(
-        GroupedCategoriesState.Loading)
-    val groupedCategoriesState: StateFlow<GroupedCategoriesState> = _groupedCategoriesState.asStateFlow()
+        GroupedCategoriesState.Loading
+    )
+    val groupedCategoriesState: StateFlow<GroupedCategoriesState> =
+        _groupedCategoriesState.asStateFlow()
+
     init {
         loadAllCategories()
+        loadGroupedCategories()
     }
 
     fun loadAllCategories() {
@@ -32,7 +36,8 @@ class CategoryViewModel @Inject constructor(
             _categoriesState.value = CategoriesState.Loading
             categoryRepository.getAllCategories()
                 .catch { e ->
-                    _categoriesState.value = CategoriesState.Error(e.message ?: "Failed to load categories")
+                    _categoriesState.value =
+                        CategoriesState.Error(e.message ?: "Failed to load categories")
                 }
                 .collectLatest { categories ->
                     _categoriesState.value = CategoriesState.Success(categories)
@@ -45,7 +50,8 @@ class CategoryViewModel @Inject constructor(
             _groupedCategoriesState.value = GroupedCategoriesState.Loading
             categoryRepository.getAllCategories()
                 .catch { e ->
-                    _groupedCategoriesState.value = GroupedCategoriesState.Error(e.message ?: "Failed to load categories")
+                    _groupedCategoriesState.value =
+                        GroupedCategoriesState.Error(e.message ?: "Failed to load categories")
                 }
                 .collectLatest { categories ->
                     val topLevel = categories.filter { it.parentId == null }
@@ -57,12 +63,14 @@ class CategoryViewModel @Inject constructor(
                 }
         }
     }
+
     fun loadCategoriesByType(type: String) {
         viewModelScope.launch {
             _categoriesState.value = CategoriesState.Loading
             categoryRepository.getCategoriesByType(type)
                 .catch { e ->
-                    _categoriesState.value = CategoriesState.Error(e.message ?: "Failed to load categories")
+                    _categoriesState.value =
+                        CategoriesState.Error(e.message ?: "Failed to load categories")
                 }
                 .collectLatest { categories ->
                     _categoriesState.value = CategoriesState.Success(categories)
@@ -75,7 +83,8 @@ class CategoryViewModel @Inject constructor(
             _groupedCategoriesState.value = GroupedCategoriesState.Loading
             categoryRepository.getCategoriesByType(type)
                 .catch { e ->
-                    _groupedCategoriesState.value = GroupedCategoriesState.Error(e.message ?: "Failed to load categories")
+                    _groupedCategoriesState.value =
+                        GroupedCategoriesState.Error(e.message ?: "Failed to load categories")
                 }
                 .collectLatest { categories ->
                     val topLevel = categories
@@ -143,53 +152,218 @@ class CategoryViewModel @Inject constructor(
             // Now add subcategories
             val subcategories = listOf(
                 // Food & Drinks subcategories
-                Category(name = "Restaurants", type = "expense", userId = userId, parentId = categoryIds["Food & Drinks"]),
-                Category(name = "Groceries", type = "expense", userId = userId, parentId = categoryIds["Food & Drinks"]),
-                Category(name = "Coffee & Tea", type = "expense", userId = userId, parentId = categoryIds["Food & Drinks"]),
-                Category(name = "Fast Food", type = "expense", userId = userId, parentId = categoryIds["Food & Drinks"]),
+                Category(
+                    name = "Restaurants",
+                    type = "expense",
+                    userId = userId,
+                    parentId = categoryIds["Food & Drinks"]
+                ),
+                Category(
+                    name = "Groceries",
+                    type = "expense",
+                    userId = userId,
+                    parentId = categoryIds["Food & Drinks"]
+                ),
+                Category(
+                    name = "Coffee & Tea",
+                    type = "expense",
+                    userId = userId,
+                    parentId = categoryIds["Food & Drinks"]
+                ),
+                Category(
+                    name = "Fast Food",
+                    type = "expense",
+                    userId = userId,
+                    parentId = categoryIds["Food & Drinks"]
+                ),
 
                 // Transportation subcategories
-                Category(name = "Fuel", type = "expense", userId = userId, parentId = categoryIds["Transportation"]),
-                Category(name = "Public Transit", type = "expense", userId = userId, parentId = categoryIds["Transportation"]),
-                Category(name = "Taxi/Ride Share", type = "expense", userId = userId, parentId = categoryIds["Transportation"]),
-                Category(name = "Parking", type = "expense", userId = userId, parentId = categoryIds["Transportation"]),
+                Category(
+                    name = "Fuel",
+                    type = "expense",
+                    userId = userId,
+                    parentId = categoryIds["Transportation"]
+                ),
+                Category(
+                    name = "Public Transit",
+                    type = "expense",
+                    userId = userId,
+                    parentId = categoryIds["Transportation"]
+                ),
+                Category(
+                    name = "Taxi/Ride Share",
+                    type = "expense",
+                    userId = userId,
+                    parentId = categoryIds["Transportation"]
+                ),
+                Category(
+                    name = "Parking",
+                    type = "expense",
+                    userId = userId,
+                    parentId = categoryIds["Transportation"]
+                ),
 
                 // Shopping subcategories
-                Category(name = "Clothing", type = "expense", userId = userId, parentId = categoryIds["Shopping"]),
-                Category(name = "Electronics", type = "expense", userId = userId, parentId = categoryIds["Shopping"]),
-                Category(name = "Home & Garden", type = "expense", userId = userId, parentId = categoryIds["Shopping"]),
-                Category(name = "Personal Care", type = "expense", userId = userId, parentId = categoryIds["Shopping"]),
+                Category(
+                    name = "Clothing",
+                    type = "expense",
+                    userId = userId,
+                    parentId = categoryIds["Shopping"]
+                ),
+                Category(
+                    name = "Electronics",
+                    type = "expense",
+                    userId = userId,
+                    parentId = categoryIds["Shopping"]
+                ),
+                Category(
+                    name = "Home & Garden",
+                    type = "expense",
+                    userId = userId,
+                    parentId = categoryIds["Shopping"]
+                ),
+                Category(
+                    name = "Personal Care",
+                    type = "expense",
+                    userId = userId,
+                    parentId = categoryIds["Shopping"]
+                ),
 
                 // Bills & Utilities subcategories
-                Category(name = "Electricity", type = "expense", userId = userId, parentId = categoryIds["Bills & Utilities"]),
-                Category(name = "Water", type = "expense", userId = userId, parentId = categoryIds["Bills & Utilities"]),
-                Category(name = "Gas", type = "expense", userId = userId, parentId = categoryIds["Bills & Utilities"]),
-                Category(name = "Internet", type = "expense", userId = userId, parentId = categoryIds["Bills & Utilities"]),
-                Category(name = "Phone", type = "expense", userId = userId, parentId = categoryIds["Bills & Utilities"]),
-                Category(name = "Rent/Mortgage", type = "expense", userId = userId, parentId = categoryIds["Bills & Utilities"]),
+                Category(
+                    name = "Electricity",
+                    type = "expense",
+                    userId = userId,
+                    parentId = categoryIds["Bills & Utilities"]
+                ),
+                Category(
+                    name = "Water",
+                    type = "expense",
+                    userId = userId,
+                    parentId = categoryIds["Bills & Utilities"]
+                ),
+                Category(
+                    name = "Gas",
+                    type = "expense",
+                    userId = userId,
+                    parentId = categoryIds["Bills & Utilities"]
+                ),
+                Category(
+                    name = "Internet",
+                    type = "expense",
+                    userId = userId,
+                    parentId = categoryIds["Bills & Utilities"]
+                ),
+                Category(
+                    name = "Phone",
+                    type = "expense",
+                    userId = userId,
+                    parentId = categoryIds["Bills & Utilities"]
+                ),
+                Category(
+                    name = "Rent/Mortgage",
+                    type = "expense",
+                    userId = userId,
+                    parentId = categoryIds["Bills & Utilities"]
+                ),
 
                 // Entertainment subcategories
-                Category(name = "Movies & TV", type = "expense", userId = userId, parentId = categoryIds["Entertainment"]),
-                Category(name = "Games", type = "expense", userId = userId, parentId = categoryIds["Entertainment"]),
-                Category(name = "Sports", type = "expense", userId = userId, parentId = categoryIds["Entertainment"]),
-                Category(name = "Hobbies", type = "expense", userId = userId, parentId = categoryIds["Entertainment"]),
+                Category(
+                    name = "Movies & TV",
+                    type = "expense",
+                    userId = userId,
+                    parentId = categoryIds["Entertainment"]
+                ),
+                Category(
+                    name = "Games",
+                    type = "expense",
+                    userId = userId,
+                    parentId = categoryIds["Entertainment"]
+                ),
+                Category(
+                    name = "Sports",
+                    type = "expense",
+                    userId = userId,
+                    parentId = categoryIds["Entertainment"]
+                ),
+                Category(
+                    name = "Hobbies",
+                    type = "expense",
+                    userId = userId,
+                    parentId = categoryIds["Entertainment"]
+                ),
 
                 // Healthcare subcategories
-                Category(name = "Doctor", type = "expense", userId = userId, parentId = categoryIds["Healthcare"]),
-                Category(name = "Pharmacy", type = "expense", userId = userId, parentId = categoryIds["Healthcare"]),
-                Category(name = "Insurance", type = "expense", userId = userId, parentId = categoryIds["Healthcare"]),
-                Category(name = "Dental", type = "expense", userId = userId, parentId = categoryIds["Healthcare"]),
+                Category(
+                    name = "Doctor",
+                    type = "expense",
+                    userId = userId,
+                    parentId = categoryIds["Healthcare"]
+                ),
+                Category(
+                    name = "Pharmacy",
+                    type = "expense",
+                    userId = userId,
+                    parentId = categoryIds["Healthcare"]
+                ),
+                Category(
+                    name = "Insurance",
+                    type = "expense",
+                    userId = userId,
+                    parentId = categoryIds["Healthcare"]
+                ),
+                Category(
+                    name = "Dental",
+                    type = "expense",
+                    userId = userId,
+                    parentId = categoryIds["Healthcare"]
+                ),
 
                 // Salary subcategories
-                Category(name = "Base Salary", type = "income", userId = userId, parentId = categoryIds["Salary"]),
-                Category(name = "Bonus", type = "income", userId = userId, parentId = categoryIds["Salary"]),
-                Category(name = "Overtime", type = "income", userId = userId, parentId = categoryIds["Salary"]),
+                Category(
+                    name = "Base Salary",
+                    type = "income",
+                    userId = userId,
+                    parentId = categoryIds["Salary"]
+                ),
+                Category(
+                    name = "Bonus",
+                    type = "income",
+                    userId = userId,
+                    parentId = categoryIds["Salary"]
+                ),
+                Category(
+                    name = "Overtime",
+                    type = "income",
+                    userId = userId,
+                    parentId = categoryIds["Salary"]
+                ),
 
                 // Investment subcategories
-                Category(name = "Stocks", type = "income", userId = userId, parentId = categoryIds["Investment"]),
-                Category(name = "Dividends", type = "income", userId = userId, parentId = categoryIds["Investment"]),
-                Category(name = "Real Estate", type = "income", userId = userId, parentId = categoryIds["Investment"]),
-                Category(name = "Interest", type = "income", userId = userId, parentId = categoryIds["Investment"])
+                Category(
+                    name = "Stocks",
+                    type = "income",
+                    userId = userId,
+                    parentId = categoryIds["Investment"]
+                ),
+                Category(
+                    name = "Dividends",
+                    type = "income",
+                    userId = userId,
+                    parentId = categoryIds["Investment"]
+                ),
+                Category(
+                    name = "Real Estate",
+                    type = "income",
+                    userId = userId,
+                    parentId = categoryIds["Investment"]
+                ),
+                Category(
+                    name = "Interest",
+                    type = "income",
+                    userId = userId,
+                    parentId = categoryIds["Investment"]
+                )
             )
 
             subcategories.forEach { category ->
@@ -207,11 +381,13 @@ class CategoryViewModel @Inject constructor(
                 .fold(
                     onSuccess = {
                         loadAllCategories()
-                        loadGroupedCategories() },
+                        loadGroupedCategories()
+                    },
                     onFailure = { /* Handle error */ }
                 )
         }
     }
+
     data class CategoryGroup(
         val parent: Category,
         val subcategories: List<Category>
