@@ -47,57 +47,56 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
-    
+
     // Compose
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
-    implementation(libs.androidx.material3)
-    implementation(libs.androidx.compose.material3)
-    debugImplementation(libs.androidx.ui.tooling)
+    implementation(libs.androidx.material3) // Keep one, remove the other
+    implementation(libs.firebase.storage)
+    debugImplementation(libs.androidx.ui.tooling) // You also have this below, it's a duplicate
 
-
-    
     // Navigation
     implementation(libs.navigation.compose)
-    
+
     // Firebase
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
 
-
     // Google Play Services
     implementation(libs.google.play.services.auth)
     implementation(libs.google.play.services.base)
-    
+
     // Hilt
     implementation(libs.hilt.android)
     kapt(libs.hilt.compiler)
     implementation(libs.hilt.navigation.compose)
-    
+
     // Coroutines
     implementation(libs.coroutines.core)
     implementation(libs.coroutines.android)
-    
+
     // Lifecycle
     implementation(libs.lifecycle.viewmodel.ktx)
     implementation(libs.lifecycle.viewmodel.compose)
-    
+
     // Charts for visualization
     implementation(libs.vico.compose)
     implementation(libs.vico.compose.m3)
 
-    //Icons
+    // Icons
     implementation("androidx.compose.material:material-icons-extended")
+
     // Image Loading
     implementation(libs.coil.compose)
+
+    // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.ui.test.junit4)
-    debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
 }

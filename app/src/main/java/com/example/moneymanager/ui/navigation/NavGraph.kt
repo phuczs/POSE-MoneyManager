@@ -277,9 +277,6 @@ fun NavGraph(
                     navController.navigate(Screen.Login.route) {
                         popUpTo(0) { inclusive = true }
                     }
-                },
-                onNavigateToTransactions = {
-                    navController.navigate(Screen.Transactions.route)
                 }
             )
         }

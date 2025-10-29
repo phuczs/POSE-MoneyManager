@@ -1,13 +1,19 @@
 package com.example.moneymanager.ui.screens.profile
 
+import android.net.Uri
+import android.util.Log
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -15,7 +21,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -27,9 +32,13 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
 import com.example.moneymanager.data.model.User
+import com.example.moneymanager.data.repository.FirebaseAuthRepository
 import com.example.moneymanager.ui.viewmodel.AuthViewModel
+import com.google.firebase.auth.FirebaseAuth
+import dagger.hilt.android.EntryPointAccessors
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -37,13 +46,12 @@ import java.util.*
 @Composable
 fun ProfileScreen(
     onNavigateToLogin: () -> Unit,
-    onNavigateToTransactions: () -> Unit,
     authViewModel: AuthViewModel = hiltViewModel(),
 ) {
+
     val authState by authViewModel.authState.collectAsStateWithLifecycle()
     val currentUser by authViewModel.currentUser.collectAsStateWithLifecycle(initialValue = null)
-    val context = LocalContext.current
-    
+
     var showEditNameDialog by remember { mutableStateOf(false) }
     var showChangePasswordDialog by remember { mutableStateOf(false) }
     var showDeleteAccountDialog by remember { mutableStateOf(false) }
@@ -91,7 +99,6 @@ fun ProfileScreen(
             onChangePasswordClick = { showChangePasswordDialog = true },
             onDeleteAccountClick = { showDeleteAccountDialog = true },
             onSignOutClick = { authViewModel.signOut() },
-            onNavigateToTransactions = onNavigateToTransactions
         )
 
         Spacer(modifier = Modifier.height(32.dp))
@@ -160,7 +167,7 @@ fun ProfileScreen(
 @Composable
 private fun ProfileHeader(
     user: User?,
-    onEditPhotoClick: () -> Unit
+    onEditPhotoClick: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -172,11 +179,20 @@ private fun ProfileHeader(
         Box(
             contentAlignment = Alignment.BottomEnd
         ) {
-            if (user?.photoUrl != null) {
+            val photoUrlString = user?.photoUrl?.toString()
+            val isImageValid = remember(photoUrlString) { mutableStateOf(true) }
+
+            if (photoUrlString != null && isImageValid.value) {
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
-                        .data(user.photoUrl)
+                        .data(photoUrlString)
                         .crossfade(true)
+                        .listener(
+                            onError = { _, result ->
+                                Log.e("ProfilePhoto", "Failed to load image", result.throwable)
+                                isImageValid.value = false
+                            }
+                        )
                         .build(),
                     contentDescription = "Profile Picture",
                     modifier = Modifier
@@ -186,6 +202,7 @@ private fun ProfileHeader(
                     contentScale = ContentScale.Crop
                 )
             } else {
+                // Fallback to initial
                 Box(
                     modifier = Modifier
                         .size(120.dp)
@@ -253,7 +270,6 @@ private fun ProfileContent(
     onChangePasswordClick: () -> Unit,
     onDeleteAccountClick: () -> Unit,
     onSignOutClick: () -> Unit,
-    onNavigateToTransactions: () -> Unit
 ) {
     Column(
         modifier = Modifier.padding(horizontal = 16.dp)
@@ -314,7 +330,7 @@ private fun ProfileContent(
         SectionHeader(title = "Danger Zone", isWarning = true)
 
         ProfileOption(
-            icon = Icons.Default.ExitToApp,
+            icon = Icons.AutoMirrored.Filled.ExitToApp,
             title = "Sign Out",
             subtitle = "Sign out of your account",
             onClick = onSignOutClick,
@@ -397,7 +413,7 @@ private fun ProfileOption(
 
             if (onClick != null) {
                 Icon(
-                    imageVector = Icons.Default.KeyboardArrowRight,
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     contentDescription = "Navigate",
                     tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                     modifier = Modifier.size(20.dp)
@@ -603,7 +619,7 @@ private fun ImagePickerDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = { 
+                onClick = {
                     if (imageUrl.isNotBlank()) {
                         onImageSelected(imageUrl.trim())
                     }

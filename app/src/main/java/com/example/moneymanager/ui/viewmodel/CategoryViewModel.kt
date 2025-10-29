@@ -87,9 +87,16 @@ class CategoryViewModel @Inject constructor(
                         GroupedCategoriesState.Error(e.message ?: "Failed to load categories")
                 }
                 .collectLatest { categories ->
+                    println("=== All categories of type $type ===")
+                    categories.forEach { cat ->
+                        println("ID: ${cat.id}, Name: ${cat.name}, ParentID: ${cat.parentId}")
+                    }
                     val topLevel = categories
                         .filter { it.parentId == null }
-                        .distinctBy { it.name.lowercase().trim() } // Safety check
+                        .distinctBy { it.name.lowercase().trim() } // Safety check\\
+
+                    println("=== Top level categories: ${topLevel.size} ===")
+                    topLevel.forEach { println("- ${it.name} (${it.id})") }
 
                     val grouped = topLevel.map { parent ->
                         val children = categories.filter { it.parentId == parent.id }

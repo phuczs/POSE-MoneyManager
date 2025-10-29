@@ -1,5 +1,7 @@
 package com.example.moneymanager.data.repository
 
+
+import android.util.Log
 import com.example.moneymanager.data.model.User
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.firebase.auth.EmailAuthProvider
@@ -16,12 +18,12 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
+import androidx.core.net.toUri
 
 @Singleton
 class FirebaseAuthRepository @Inject constructor(
-    private val auth: FirebaseAuth
+    private val auth: FirebaseAuth,
 ) : AuthRepository {
-
     override val currentUser: Flow<User?> = callbackFlow {
         val listener = FirebaseAuth.AuthStateListener { auth ->
             trySend(auth.currentUser?.let { firebaseUser ->
@@ -196,10 +198,13 @@ class FirebaseAuthRepository @Inject constructor(
     override suspend fun updateProfilePhoto(photoUrl: String): Result<Unit> {
         return try {
             val user = auth.currentUser ?: return Result.failure(Exception("User not authenticated"))
+
             val profileUpdates = userProfileChangeRequest {
                 this.photoUri = android.net.Uri.parse(photoUrl)
             }
             user.updateProfile(profileUpdates).await()
+            user.reload().await()
+            Log.d("ProfilePhoto", "Saved photoUrl: ${user.photoUrl}")
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -216,3 +221,4 @@ class FirebaseAuthRepository @Inject constructor(
         }
     }
 }
+
