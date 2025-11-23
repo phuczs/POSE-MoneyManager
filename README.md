@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # MoneyManager
 
 A modern Android application for personal finance management built with Jetpack Compose and Firebase.
@@ -188,3 +189,6 @@ If you encounter any issues:
 ---
 
 **Built with ❤️ using Jetpack Compose and Firebase**
+=======
+# POSE-MoneyManager
+>>>>>>> c31cd1fab3c60390854d51ade04cccda3f774d09
