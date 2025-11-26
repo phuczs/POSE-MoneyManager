@@ -12,8 +12,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Category
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.MonetizationOn
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -91,7 +94,7 @@ fun MainContainer(
                             selectedTabIndex = 1
                             navController.navigate(Screen.Transactions.route)
                         },
-                        icon = Icons.AutoMirrored.Filled.List,
+                        icon = Icons.Default.History,
                         label = "Transactions"
                     )
 
@@ -126,15 +129,15 @@ fun MainContainer(
                         )
                     )
 
-                    // 4. Categories
+                    // 4. Budgets
                     NavBarItem(
                         selected = selectedTabIndex == 3,
                         onClick = {
                             selectedTabIndex = 3
-                            navController.navigate(Screen.Categories.route)
+                            navController.navigate(Screen.Budgets.route)
                         },
-                        icon = Icons.Default.Category,
-                        label = "Category"
+                        icon = Icons.Default.PieChart,
+                        label = "Budgets"
                     )
 
                     // 5. Profile

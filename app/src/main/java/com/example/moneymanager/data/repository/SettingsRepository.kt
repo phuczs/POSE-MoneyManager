@@ -17,6 +17,16 @@ class SettingsRepository @Inject constructor(
     private val NOTIFICATIONS_KEY = "notifications_enabled"
 
     private val _isNotificationsEnabled = MutableStateFlow(prefs.getBoolean(NOTIFICATIONS_KEY, true))
+
+    private val _alertedBudgets = mutableSetOf<String>()
+
+    fun hasAlerted(budgetId: String): Boolean {
+        return _alertedBudgets.contains(budgetId)
+    }
+
+    fun setAlerted(budgetId: String) {
+        _alertedBudgets.add(budgetId)
+    }
     val isNotificationsEnabled: StateFlow<Boolean> = _isNotificationsEnabled.asStateFlow()
 
     fun setNotificationsEnabled(enabled: Boolean) {

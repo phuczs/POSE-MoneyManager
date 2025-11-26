@@ -32,7 +32,6 @@ class BudgetViewModel @Inject constructor(
     val uiState: StateFlow<BudgetsUiState> = _uiState.asStateFlow()
 
     // Track which budgets we've already alerted in this session to avoid spam
-    private val alertedBudgets = mutableSetOf<String>()
 
     init {
         loadBudgets()
@@ -71,17 +70,21 @@ class BudgetViewModel @Inject constructor(
     }
 
     private suspend fun checkBudgetAlerts(budgets: List<Budget>) {
+        // Check if user has disabled notifications globally
         if (!settingsRepository.isNotificationsEnabled.first()) return
 
         budgets.forEach { budget ->
-            // Alert if status is Warning (>= 90%) or Over
-            // And we haven't alerted for this budget ID in this session yet
-            if ((budget.status == BudgetStatus.Warning || budget.status == BudgetStatus.Over) && !alertedBudgets.contains(budget.id)) {
+            // Alert if status is Warning or Over
+            if (budget.status == BudgetStatus.Warning || budget.status == BudgetStatus.Over) {
 
-                val percent = (budget.progress * 100).toInt()
-                notificationHelper.showBudgetAlert(budget.id, budget.category, percent)
+                // --- FIX: Check the singleton repository instead of local state ---
+                if (!settingsRepository.hasAlerted(budget.id)) {
+                    val percent = (budget.progress * 100).toInt()
+                    notificationHelper.showBudgetAlert(budget.id, budget.category, percent)
 
-                alertedBudgets.add(budget.id)
+                    // Mark as alerted in the singleton repository
+                    settingsRepository.setAlerted(budget.id)
+                }
             }
         }
     }

@@ -2,13 +2,11 @@ package com.example.moneymanager.ui.screens.profile
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -24,7 +22,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -41,8 +38,6 @@ import coil.request.ImageRequest
 import com.example.moneymanager.data.model.User
 import com.example.moneymanager.ui.theme.MediumGreen
 import com.example.moneymanager.ui.viewmodel.AuthViewModel
-import java.text.SimpleDateFormat
-import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,7 +46,6 @@ fun ProfileScreen(
     onNavigateToBudgets: () -> Unit,
     authViewModel: AuthViewModel = hiltViewModel(),
 ) {
-
     val authState by authViewModel.authState.collectAsStateWithLifecycle()
     val currentUser by authViewModel.currentUser.collectAsStateWithLifecycle(initialValue = null)
     val isNotificationsEnabled by authViewModel.isNotificationsEnabled.collectAsStateWithLifecycle(initialValue = true)
@@ -63,7 +57,7 @@ fun ProfileScreen(
 
     val context = LocalContext.current
 
-    // Permission Launcher
+    // Permission Launcher for Android 13+ Notification Permission
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
         onResult = { isGranted ->
@@ -131,7 +125,8 @@ fun ProfileScreen(
         Spacer(modifier = Modifier.height(32.dp))
     }
 
-    // ... (Keep all existing Dialogs: EditNameDialog, ChangePasswordDialog, etc.) ...
+    // --- Dialogs ---
+
     if (showEditNameDialog) {
         EditNameDialog(
             currentName = currentUser?.displayName ?: "",
@@ -184,7 +179,6 @@ fun ProfileScreen(
     }
 }
 
-// ... (ProfileHeader implementation remains the same) ...
 @Composable
 private fun ProfileHeader(
     user: User?,
@@ -273,7 +267,6 @@ private fun ProfileHeader(
     }
 }
 
-
 @Composable
 private fun ProfileContent(
     user: User?,
@@ -297,7 +290,19 @@ private fun ProfileContent(
             onClick = onEditNameClick
         )
 
-        // ... (Password & Email options) ...
+        ProfileOption(
+            icon = Icons.Default.Email,
+            title = "Email",
+            subtitle = user?.email ?: "",
+            onClick = null // Email cannot be changed easily
+        )
+
+        ProfileOption(
+            icon = Icons.Default.Lock,
+            title = "Change Password",
+            subtitle = "Update your security",
+            onClick = onChangePasswordClick
+        )
 
         Spacer(modifier = Modifier.height(24.dp))
 
@@ -319,7 +324,12 @@ private fun ProfileContent(
             onClick = onNavigateToBudgets
         )
 
-        // ... (Other options) ...
+        ProfileOption(
+            icon = Icons.Default.Language,
+            title = "Language",
+            subtitle = "English (US)",
+            onClick = { /* TODO: Implement Language Selection */ }
+        )
 
         Spacer(modifier = Modifier.height(24.dp))
 
@@ -333,9 +343,18 @@ private fun ProfileContent(
             onClick = onSignOutClick,
             isWarning = false
         )
-        // ...
+
+        ProfileOption(
+            icon = Icons.Default.DeleteForever,
+            title = "Delete Account",
+            subtitle = "Permanently delete your account and data",
+            onClick = onDeleteAccountClick,
+            isWarning = true
+        )
     }
 }
+
+// --- Helper Composables ---
 
 @Composable
 private fun ProfileToggleOption(
@@ -377,7 +396,6 @@ private fun ProfileToggleOption(
     }
 }
 
-// ... (Helper Composables: SectionHeader, ProfileOption, Dialogs etc. - keep as is) ...
 @Composable
 private fun SectionHeader(
     title: String,
@@ -453,6 +471,8 @@ private fun ProfileOption(
         }
     }
 }
+
+// --- Dialogs Implementations ---
 
 @Composable
 private fun EditNameDialog(
@@ -545,7 +565,7 @@ private fun ChangePasswordDialog(
 
                 if (showError) {
                     Text(
-                        text = "Passwords do not match",
+                        text = "Passwords do not match or too short (min 6 chars)",
                         color = MaterialTheme.colorScheme.error,
                         fontSize = 12.sp,
                         modifier = Modifier.padding(top = 4.dp)
@@ -642,7 +662,7 @@ private fun ImagePickerDialog(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Note: In a real app, you would integrate with image picker or camera",
+                    text = "Note: For real implementation, integrate with system image picker.",
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )

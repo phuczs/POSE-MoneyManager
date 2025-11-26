@@ -334,8 +334,8 @@ fun QuickActionsSection(
             contentPadding = PaddingValues(horizontal = 24.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            item { QuickActionItem("Send", Icons.Default.Send, MediumGreen, onNavigateToAddTransaction) }
-            item { QuickActionItem("History", Icons.Default.History, Color(0xFFFFA000), onNavigateToTransactions) }
+            item { QuickActionItem("Add", Icons.Default.Add, MediumGreen, onNavigateToAddTransaction) }
+            item { QuickActionItem("Transactions", Icons.Default.History, Color(0xFFFFA000), onNavigateToTransactions) }
             item { QuickActionItem("Budgets", Icons.Default.PieChart, Color(0xFF5C6BC0), onNavigateToBudgets) }
             item { QuickActionItem("Category", Icons.Default.Category, Color(0xFFEF5350), onNavigateToCategories) }
         }
