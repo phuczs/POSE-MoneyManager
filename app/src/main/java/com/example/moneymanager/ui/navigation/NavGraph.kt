@@ -56,6 +56,9 @@ import com.example.moneymanager.ui.screens.transaction.TransactionsScreen
 import com.example.moneymanager.ui.theme.MediumGreen
 import com.example.moneymanager.ui.theme.TextGray
 import com.example.moneymanager.ui.viewmodel.AuthViewModel
+import com.example.moneymanager.ui.screens.chat.ChatScreen
+import com.example.moneymanager.ui.viewmodel.ChatViewModel // Đảm bảo đã import ViewModel này
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -249,7 +252,8 @@ fun NavGraph(
                     navController.navigate(Screen.EditTransaction.createRoute(transactionId))
                 },
                 onNavigateToStatistics = { navController.navigate(Screen.Statistics.route)},
-                onNavigateToBudgets = { navController.navigate(Screen.Budgets.route) }
+                onNavigateToBudgets = { navController.navigate(Screen.Budgets.route) },
+                onNavigateToChat = { navController.navigate(Screen.Chat.route) }
             )
         }
 
@@ -302,6 +306,17 @@ fun NavGraph(
 
         composable(Screen.Budgets.route) {
             BudgetScreen()
+        }
+        composable(Screen.Chat.route) {
+            // 1. Lấy instance của ChatViewModel thông qua Hilt
+            val chatViewModel: ChatViewModel = hiltViewModel()
+
+            ChatScreen(
+                // 2. Truyền viewModel vào
+               viewModel = chatViewModel,
+                // 3. Đổi tên tham số 'onNavigateBack' thành 'onClose' để khớp với định nghĩa của ChatScreen
+                onClose = { navController.popBackStack() }
+            )
         }
     }
 }

@@ -4,6 +4,9 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.shadow
+import androidx.compose.foundation.text.KeyboardActions    import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -38,6 +41,7 @@ import com.example.moneymanager.ui.theme.TextPrimary
 import com.example.moneymanager.ui.viewmodel.AuthViewModel
 import com.example.moneymanager.ui.viewmodel.TransactionViewModel
 import com.example.moneymanager.ui.viewmodel.BudgetViewModel
+import androidx.compose.material.icons.filled.SmartToy
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -50,6 +54,7 @@ fun DashboardScreen(
     onNavigateToCategories: () -> Unit,
     onNavigateToProfile: () -> Unit,
     onNavigateToBudgets: () -> Unit,
+    onNavigateToChat: () -> Unit,
     onTransactionClick: (String) -> Unit,
     authViewModel: AuthViewModel = hiltViewModel(),
     transactionViewModel: TransactionViewModel = hiltViewModel(),
@@ -57,6 +62,22 @@ fun DashboardScreen(
 ) {
     val currentUser by authViewModel.currentUser.collectAsState(initial = null)
     val transactionsState by transactionViewModel.transactionsState.collectAsState()
+    val quickAddState by transactionViewModel.quickAddState.collectAsState()
+    var quickAddText by remember { mutableStateOf("") }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(quickAddState) {
+        when (val state = quickAddState) {
+            is TransactionViewModel.QuickAddState.Success -> {
+                quickAddText = "" // Xóa ô nhập sau khi thành công
+                snackbarHostState.showSnackbar(state.message)
+            }
+            is TransactionViewModel.QuickAddState.Error -> {
+                snackbarHostState.showSnackbar(state.message)
+            }
+            else -> {}
+        }
+    }
 
     LaunchedEffect(Unit) {
         transactionViewModel.loadAllTransactions()
@@ -64,14 +85,15 @@ fun DashboardScreen(
     }
 
     Scaffold(
-        containerColor = BackgroundGray
+        containerColor = BackgroundGray ,
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // 1. Emerald Header with Balance
+            // 1. Emerald Header with Balance (Đã bỏ nút Chat ở đây)
             item {
                 DashboardHeader(
                     user = currentUser,
@@ -79,14 +101,27 @@ fun DashboardScreen(
                     onProfileClick = onNavigateToProfile
                 )
             }
+            item {
+                QuickAddCard(
+                    text = quickAddText,
+                    onTextChanged = { quickAddText = it },
+                    isLoading = quickAddState is TransactionViewModel.QuickAddState.Loading, // Truyền trạng thái loading
+                    onSendClick = {
+                        if (quickAddText.isNotBlank()) {
+                            transactionViewModel.processQuickAdd(quickAddText) // Gọi hàm xử lý tại chỗ
+                        }
+                    }
+                )
+            }
 
-            // 2. Quick Actions
+            // 2. Quick Actions (Đã thêm nút Chat vào đây)
             item {
                 QuickActionsSection(
                     onNavigateToAddTransaction = onNavigateToAddTransaction,
                     onNavigateToTransactions = onNavigateToTransactions,
                     onNavigateToCategories = onNavigateToCategories,
-                    onNavigateToBudgets = onNavigateToBudgets
+                    onNavigateToBudgets = onNavigateToBudgets,
+                    onNavigateToChat = onNavigateToChat // Truyền hàm điều hướng vào
                 )
             }
 
@@ -159,12 +194,70 @@ fun DashboardScreen(
         }
     }
 }
+@Composable
+fun QuickAddCard(
+    text: String,
+    onTextChanged: (String) -> Unit,
+    isLoading: Boolean, // Thêm tham số này
+    onSendClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp)
+            .offset(y = (-24).dp)
+            .shadow(8.dp, RoundedCornerShape(16.dp)),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White)
+    ) {
+        Row(
+            modifier = Modifier.padding(8.dp).fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedTextField(
+                value = text,
+                onValueChange = onTextChanged,
+                placeholder = { Text("Thêm nhanh (vd: Ăn sáng 30k)", style = MaterialTheme.typography.bodyMedium, color = TextGray.copy(alpha = 0.7f)) },
+                modifier = Modifier.weight(1f).padding(end = 8.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Color.Transparent,
+                    unfocusedBorderColor = Color.Transparent,
+                    focusedContainerColor = BackgroundGray.copy(alpha = 0.5f),
+                    unfocusedContainerColor = BackgroundGray.copy(alpha = 0.5f)
+                ),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                keyboardActions = KeyboardActions(onSend = { if(!isLoading) onSendClick() }),
+                enabled = !isLoading
+            )
 
+            // Nút gửi biến thành Loading khi đang xử lý
+            Box(contentAlignment = Alignment.Center) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp).padding(4.dp),
+                        color = MediumGreen,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    IconButton(
+                        onClick = onSendClick,
+                        modifier = Modifier.size(48.dp).background(MediumGreen, CircleShape)
+                    ) {
+                        Icon(Icons.Filled.Send, "Quick Add", tint = Color.White, modifier = Modifier.size(20.dp))
+                    }
+                }
+            }
+        }
+    }
+}
 @Composable
 fun DashboardHeader(
     user: com.example.moneymanager.data.model.User?,
     transactionsState: TransactionViewModel.TransactionsState,
     onProfileClick: () -> Unit
+    // Đã xóa tham số onChatClick
 ) {
     Box(
         modifier = Modifier
@@ -222,6 +315,8 @@ fun DashboardHeader(
             }
 
             Spacer(modifier = Modifier.height(24.dp))
+
+            // Đã xóa nút Chat ở đây
 
             // Balance Card
             Card(
@@ -327,7 +422,8 @@ fun QuickActionsSection(
     onNavigateToAddTransaction: () -> Unit,
     onNavigateToTransactions: () -> Unit,
     onNavigateToCategories: () -> Unit,
-    onNavigateToBudgets: () -> Unit
+    onNavigateToBudgets: () -> Unit,
+    onNavigateToChat: () -> Unit // Thêm tham số này
 ) {
     Column(modifier = Modifier.padding(top = 16.dp)) {
         LazyRow(
@@ -338,6 +434,8 @@ fun QuickActionsSection(
             item { QuickActionItem("Transactions", Icons.Default.History, Color(0xFFFFA000), onNavigateToTransactions) }
             item { QuickActionItem("Budgets", Icons.Default.PieChart, Color(0xFF5C6BC0), onNavigateToBudgets) }
             item { QuickActionItem("Category", Icons.Default.Category, Color(0xFFEF5350), onNavigateToCategories) }
+            // Nút Chat mới được thêm vào đây
+            item { QuickActionItem("AI Chat", Icons.Default.SmartToy, Color(0xFF9C27B0), onNavigateToChat) }
         }
     }
 }
@@ -359,6 +457,7 @@ fun QuickActionItem(text: String, icon: ImageVector, color: Color, onClick: () -
     }
 }
 
+// ... (Các phần còn lại của file giữ nguyên: SpendingOverviewSection, DonutChart, TransactionListItem, EmptyStateCard) ...
 @Composable
 fun SpendingOverviewSection(
     transactionsState: TransactionViewModel.TransactionsState,
