@@ -362,7 +362,7 @@ fun DashboardHeader(
                         FinanceIndicator(
                             label = "Income",
                             amount = income,
-                            icon = Icons.Default.ArrowDownward, // Arrow down into wallet
+                            icon = Icons.Default.ArrowUpward, // Arrow down into wallet
                             color = Color(0xFF4CAF50),
                             bgColor = Color(0xFFE8F5E9)
                         )
@@ -375,7 +375,7 @@ fun DashboardHeader(
                         FinanceIndicator(
                             label = "Expenses",
                             amount = expense,
-                            icon = Icons.Default.ArrowUpward, // Arrow up out of wallet
+                            icon = Icons.Default.ArrowDownward, // Arrow up out of wallet
                             color = Color(0xFFF44336),
                             bgColor = Color(0xFFFFEBEE)
                         )
@@ -624,7 +624,7 @@ fun TransactionListItem(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = if (transaction.type == "income") Icons.Default.ArrowDownward else Icons.Default.ArrowUpward,
+                    imageVector = if (transaction.type == "income") Icons.Default.ArrowUpward else Icons.Default.ArrowDownward,
                     contentDescription = null,
                     tint = if (transaction.type == "income") Color(0xFF4CAF50) else Color(0xFFF44336),
                     modifier = Modifier.size(24.dp)

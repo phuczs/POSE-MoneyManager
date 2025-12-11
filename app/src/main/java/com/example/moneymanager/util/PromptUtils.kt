@@ -31,32 +31,36 @@ object PromptUtils {
 
     fun getQuickAddPrompt(input: String, categoryNames: String): String {
         return """
-            Bạn là công cụ trích xuất thông tin CHI TIÊU (Expense) từ văn bản tiếng Việt.
+            Bạn là công cụ trích xuất dữ liệu giao dịch tài chính từ văn bản tiếng Việt.
                     
                     INPUT: "$input"
+                    DANH MỤC HỆ THỐNG: [$categoryNames, General, Salary, Bonus, Food & Drinks, Shopping]
                     
-                    DANH MỤC HỆ THỐNG: [$categoryNames, General, Food & Drinks, Transportation, Shopping]
+                    NHIỆM VỤ: Trả về JSON với các trường: "amount", "type", "category", "description".
                     
-                    NHIỆM VỤ: Trả về JSON với các trường sau:
-                    1. "amount": Số tiền (Double). Tự động đổi: "k/nghìn"->000, "tr/m/củ"->000000, "lít"->00000.
-                    2. "category": Chọn 1 tên trong danh sách trên khớp nhất với nội dung. Nếu không rõ, chọn "General".
-                    3. "description": Viết lại nội dung ngắn gọn, viết hoa chữ cái đầu.
-                    4. "type": Luôn là "expense".
+                    1. QUY TẮC PHÂN LOẠI "type" (Rất quan trọng):
+                       - INCOME (Thu nhập): Nếu câu chứa từ khóa "nhận", "lương", "thưởng", "lãi", "bán", "được cho", "biếu", "hoàn tiền", "thu".
+                       - EXPENSE (Chi tiêu): Nếu câu chứa "mua", "trả", "đóng", "nạp", "đi" (chợ/xe), "ăn", "uống", "sắm", "tốn", "chi".
+                       - MẶC ĐỊNH (Nếu không rõ động từ):
+                         + Nếu nội dung liên quan tiền vào (vd: lương, thưởng) -> INCOME.
+                         + Nếu nội dung liên quan tiêu dùng (vd: cafe, xăng, điện, nước) -> EXPENSE.
+                    
+                    2. QUY TẮC SỐ TIỀN:
+                       - "k", "nghìn", "ng" -> 000
+                       - "m", "tr", "triệu", "củ" -> 000000
+                       - "lít" -> 00000 (trăm nghìn)
+                       - "tỷ" -> 000000000
+                    
+                    3. DANH MỤC: Chọn tên trong danh sách khớp nhất. Nếu không, chọn "General".
                     
                     VÍ DỤ MẪU (HỌC THEO LOGIC NÀY):
-                    User: "cafe 25k" 
-                    JSON: {"amount": 25000, "category": "Food & Drinks", "description": "Cafe", "type": "expense"}
+                    User: "nhận lương 15tr" -> JSON: {"amount": 15000000, "type": "income", "category": "Salary", "description": "Lương tháng"}
+                    User: "bán đồ cũ 500k" -> JSON: {"amount": 500000, "type": "income", "category": "Other Income", "description": "Bán đồ cũ"}
+                    User: "cafe 30k" -> JSON: {"amount": 30000, "type": "expense", "category": "Food & Drinks", "description": "Cafe"} (Mặc định Expense vì là đồ uống)
+                    User: "đóng tiền điện 1 củ" -> JSON: {"amount": 1000000, "type": "expense", "category": "Bills & Utilities", "description": "Tiền điện"}
+                    User: "đổ xăng 50" -> JSON: {"amount": 50000, "type": "expense", "category": "Transportation", "description": "Đổ xăng"} (Hiểu ngầm 50 là 50k)
                     
-                    User: "đổ xăng 50" (Hiểu là 50k)
-                    JSON: {"amount": 50000, "category": "Transportation", "description": "Đổ xăng", "type": "expense"}
-                    
-                    User: "mua áo khoác 1 củ 2" (1.2 triệu)
-                    JSON: {"amount": 1200000, "category": "Shopping", "description": "Mua áo khoác", "type": "expense"}
-                    
-                    User: "trả tiền điện 500 ngàn"
-                    JSON: {"amount": 500000, "category": "Bills & Utilities", "description": "Tiền điện", "type": "expense"}
-                    
-                    CHỈ TRẢ VỀ ĐÚNG 1 CHUỖI JSON DUY NHẤT:
+                    CHỈ TRẢ VỀ JSON:
         """.trimIndent()
     }
 

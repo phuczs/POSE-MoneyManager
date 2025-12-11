@@ -469,7 +469,7 @@ fun TransactionListItem(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = if (transaction.type == "income") Icons.Default.ArrowDownward else Icons.Default.ArrowUpward,
+                    imageVector = if (transaction.type == "income") Icons.Default.ArrowUpward else Icons.Default.ArrowDownward,
                     contentDescription = null,
                     tint = if (transaction.type == "income") Color(0xFF4CAF50) else Color(0xFFF44336),
                     modifier = Modifier.size(24.dp)

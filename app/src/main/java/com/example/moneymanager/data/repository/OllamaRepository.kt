@@ -10,7 +10,7 @@ import javax.inject.Singleton
 class OllamaRepository @Inject constructor(
     private val ollamaService: OllamaService
 ) {
-    suspend fun sendMessage(prompt: String, modelName: String = "qwen2.5:1.5b", jsonMode: Boolean = false): Result<String> {
+    suspend fun sendMessage(prompt: String, modelName: String = "qwen2.5:3b", jsonMode: Boolean = false): Result<String> {
         return try {
             val request = OllamaRequest(model = modelName, prompt = prompt,format = if (jsonMode) "json" else null)
             val response = ollamaService.generate(request)

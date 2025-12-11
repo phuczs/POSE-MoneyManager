@@ -7,6 +7,7 @@ import com.example.moneymanager.data.model.ChatMessage
 import com.example.moneymanager.data.repository.BudgetRepository
 import com.example.moneymanager.data.repository.OllamaRepository
 import com.example.moneymanager.data.repository.TransactionRepository
+import com.example.moneymanager.util.PromptUtils
 import com.example.moneymanager.util.toCurrencyString
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,7 +26,6 @@ class ChatViewModel @Inject constructor(
     private val ollamaRepository: OllamaRepository,
     private val transactionRepository: TransactionRepository,
     private val budgetRepository: BudgetRepository
-    // Không cần CategoryRepository nữa vì không xử lý thêm giao dịch ở đây
 ) : ViewModel() {
 
     private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
@@ -50,6 +50,9 @@ class ChatViewModel @Inject constructor(
                 val allTransactions = withTimeoutOrNull(3000) {
                     transactionRepository.getAllTransactions().first()
                 } ?: emptyList()
+                val allBudgets = withTimeoutOrNull(3000) {
+                    budgetRepository.getBudgets(Date()).first()
+                } ?: emptyList()
 
                 // 2. Tính toán số liệu cơ bản
                 val today = LocalDate.now()
@@ -69,15 +72,32 @@ class ChatViewModel @Inject constructor(
                     .sortedByDescending { it.second }
                     .take(3)
                     .joinToString(", ") { "${it.first}: ${it.second.toCurrencyString()}" }
+                val budgetAnalysis = if (allBudgets.isNotEmpty()) {
+                    val details = allBudgets.joinToString("\n") { budget ->
+                        val spentForBudget = allTransactions.filter { tx ->
+                            tx.category == budget.category &&
+                                    tx.type == "expense" &&
+                                    tx.date.toDate() >= budget.startDate &&
+                                    tx.date.toDate() <= budget.endDate
+                        }.sumOf { it.amount }
+
+                        val percent = if (budget.allocatedAmount > 0) (spentForBudget / budget.allocatedAmount * 100).toInt() else 0
+                        val status = when {
+                            percent >= 100 -> "VƯỢT QUÁ"
+                            percent >= 80 -> "Cảnh báo"
+                            else -> "An toàn"
+                        }
+                        "- ${budget.category}: Đã tiêu ${spentForBudget.toCurrencyString()}/${budget.allocatedAmount.toCurrencyString()} ($percent% - $status)"
+                    }
+                    "\nTÌNH HÌNH NGÂN SÁCH:\n$details"
+                } else {
+                    "\nTÌNH HÌNH NGÂN SÁCH: Chưa thiết lập ngân sách."
+                }
 
                 // 3. Tạo ngữ cảnh cho AI
-                financialContextPrompt = """
-                    THÔNG TIN TÀI CHÍNH THÁNG NÀY CỦA NGƯỜI DÙNG:
-                    - Tổng thu: ${totalIncome.toCurrencyString()}
-                    - Tổng chi: ${totalExpense.toCurrencyString()}
-                    - Số dư: ${balance.toCurrencyString()}
-                    - Top chi tiêu: ${if (expenseByCategory.isNotBlank()) expenseByCategory else "Chưa có dữ liệu"}
-                """.trimIndent()
+                financialContextPrompt = PromptUtils.getFinancialAdvisorPrompt(
+                    totalIncome, totalExpense, balance, expenseByCategory, budgetAnalysis
+                )
 
                 _chatState.value = ChatUiState.Success
 
@@ -107,19 +127,8 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 // 3. Tạo Prompt chuyên cho việc TƯ VẤN (Advisor Prompt)
-                val prompt = """
-                    Bạn là một Chuyên gia Tài chính cá nhân thân thiện và chuyên nghiệp.
-                    
-                    DỮ LIỆU CỦA NGƯỜI DÙNG:
-                    $financialContextPrompt
-                    
-                    CÂU HỎI: "$messageContent"
-                    
-                    NHIỆM VỤ:
-                    - Trả lời câu hỏi hoặc đưa ra lời khuyên dựa trên số liệu thực tế ở trên.
-                    - Phong cách: Lịch sự, ngắn gọn, súc tích, dùng tiếng Việt tự nhiên.
-                    - KHÔNG trả về JSON. Hãy trả lời bằng văn bản thường (text).
-                """.trimIndent()
+                val prompt = PromptUtils.getChatAdvisorPrompt(financialContextPrompt, messageContent)
+
 
                 // Gọi API với jsonMode = false (để nhận văn bản thường)
                 val result = ollamaRepository.sendMessage(prompt, jsonMode = false)
