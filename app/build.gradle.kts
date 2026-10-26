@@ -28,6 +28,11 @@ android {
         // Tạo biến BuildConfig.apiKey để dùng trong code Kotlin
         buildConfigField("String", "apiKey", "\"$apiKey\"")
 
+        // Gemini API Key — stored in local.properties (git-ignored), NEVER hardcode here.
+        // To use: add 'geminiApiKey=AIza...' to local.properties
+        val geminiApiKey = properties.getProperty("geminiApiKey") ?: ""
+        buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
+
     }
 
     buildTypes {
@@ -105,6 +110,7 @@ dependencies {
     implementation(libs.vico.compose)
     implementation(libs.vico.compose.m3)
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    implementation("com.valentinilk.shimmer:compose-shimmer:1.3.0")
 
     // Icons
     implementation("androidx.compose.material:material-icons-extended")
@@ -114,8 +120,27 @@ dependencies {
     // Image Loading
     implementation(libs.coil.compose)
 
+    // WorkManager
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
+
+    // Biometric & Process Lifecycle
+    implementation("androidx.biometric:biometric-ktx:1.2.0-alpha05")
+    implementation("androidx.lifecycle:lifecycle-process:2.7.0")
+
+    // Room
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    implementation(libs.room.paging)
+    kapt(libs.room.compiler)
+
+    // Paging 3
+    implementation(libs.paging.runtime)
+    implementation(libs.paging.compose)
+
     // Testing
     testImplementation(libs.junit)
+    testImplementation(libs.mockk)
+    testImplementation(libs.coroutines.test)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))

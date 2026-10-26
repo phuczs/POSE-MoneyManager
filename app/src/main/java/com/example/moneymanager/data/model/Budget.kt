@@ -1,37 +1,22 @@
+@file:Suppress("NOTHING_TO_INLINE")
 package com.example.moneymanager.data.model
 
-import com.google.firebase.firestore.DocumentId
-import java.util.Date
+/**
+ * Backward-compatibility alias.
+ * See [com.example.moneymanager.domain.model.Budget] for the canonical type.
+ * TODO: Migrate UI screen imports and delete this file.
+ */
+typealias Budget = com.example.moneymanager.domain.model.Budget
 
 /**
- * Represents a budget for a specific category over a defined period.
+ * Backward-compatibility alias.
+ * See [com.example.moneymanager.domain.model.BudgetStatus] for the canonical type.
  */
-data class Budget(
-    @DocumentId
-    val id: String = "",
-    val userId: String = "",
-    val category: String = "",
-    val allocatedAmount: Double = 0.0,
-    val spentAmount: Double = 0.0,
-    val startDate: Date = Date(),
-    val endDate: Date = Date(),
-) {
-    val progress: Float
-        get() = if (allocatedAmount > 0) (spentAmount / allocatedAmount).toFloat() else 0f
-
-    val status: BudgetStatus
-        get() = when {
-            progress < 0.5f -> BudgetStatus.Normal
-            progress <= 0.9f -> BudgetStatus.Warning
-            else -> BudgetStatus.Over
-        }
-}
+typealias BudgetStatus = com.example.moneymanager.domain.model.BudgetStatus
 
 /**
- * Represents the different states of a budget.
+ * Backward-compatibility alias.
+ * See [com.example.moneymanager.domain.model.BudgetPeriod] for the canonical type.
  */
-enum class BudgetStatus {
-    Normal, // < 50%
-    Warning, // 50% - 90%
-    Over // > 90%
-}
+typealias BudgetPeriod = com.example.moneymanager.domain.model.BudgetPeriod
+

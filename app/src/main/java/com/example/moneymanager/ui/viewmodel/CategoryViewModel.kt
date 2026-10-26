@@ -2,8 +2,11 @@ package com.example.moneymanager.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.moneymanager.data.model.Category
-import com.example.moneymanager.data.repository.CategoryRepository
+import com.example.moneymanager.domain.model.Category
+import com.example.moneymanager.domain.usecase.category.AddCategoryUseCase
+import com.example.moneymanager.domain.usecase.category.DeleteCategoryUseCase
+import com.example.moneymanager.domain.usecase.category.GetAllCategoriesUseCase
+import com.example.moneymanager.domain.usecase.category.GetCategoriesByTypeUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,16 +18,17 @@ import javax.inject.Inject
 
 @HiltViewModel
 class CategoryViewModel @Inject constructor(
-    private val categoryRepository: CategoryRepository,
+    private val getAllCategoriesUseCase: GetAllCategoriesUseCase,
+    private val getCategoriesByTypeUseCase: GetCategoriesByTypeUseCase,
+    private val addCategoryUseCase: AddCategoryUseCase,
+    private val deleteCategoryUseCase: DeleteCategoryUseCase
 ) : ViewModel() {
 
     private val _categoriesState = MutableStateFlow<CategoriesState>(CategoriesState.Loading)
     val categoriesState: StateFlow<CategoriesState> = _categoriesState.asStateFlow()
-    private val _groupedCategoriesState = MutableStateFlow<GroupedCategoriesState>(
-        GroupedCategoriesState.Loading
-    )
-    val groupedCategoriesState: StateFlow<GroupedCategoriesState> =
-        _groupedCategoriesState.asStateFlow()
+
+    private val _groupedCategoriesState = MutableStateFlow<GroupedCategoriesState>(GroupedCategoriesState.Loading)
+    val groupedCategoriesState: StateFlow<GroupedCategoriesState> = _groupedCategoriesState.asStateFlow()
 
     init {
         loadAllCategories()
@@ -34,10 +38,22 @@ class CategoryViewModel @Inject constructor(
     fun loadAllCategories() {
         viewModelScope.launch {
             _categoriesState.value = CategoriesState.Loading
-            categoryRepository.getAllCategories()
+            getAllCategoriesUseCase()
                 .catch { e ->
-                    _categoriesState.value =
-                        CategoriesState.Error(e.message ?: "Failed to load categories")
+                    _categoriesState.value = CategoriesState.Error(e.message ?: "Failed to load categories")
+                }
+                .collectLatest { categories ->
+                    _categoriesState.value = CategoriesState.Success(categories)
+                }
+        }
+    }
+
+    /** Load only categories of the given type (used by Add/Edit Transaction screen). */
+    fun loadCategoriesByType(type: String) {
+        viewModelScope.launch {
+            getCategoriesByTypeUseCase(type)
+                .catch { e ->
+                    _categoriesState.value = CategoriesState.Error(e.message ?: "Failed to load categories")
                 }
                 .collectLatest { categories ->
                     _categoriesState.value = CategoriesState.Success(categories)
@@ -48,32 +64,16 @@ class CategoryViewModel @Inject constructor(
     fun loadGroupedCategories() {
         viewModelScope.launch {
             _groupedCategoriesState.value = GroupedCategoriesState.Loading
-            categoryRepository.getAllCategories()
+            getAllCategoriesUseCase()
                 .catch { e ->
-                    _groupedCategoriesState.value =
-                        GroupedCategoriesState.Error(e.message ?: "Failed to load categories")
+                    _groupedCategoriesState.value = GroupedCategoriesState.Error(e.message ?: "Failed to load categories")
                 }
                 .collectLatest { categories ->
                     val topLevel = categories.filter { it.parentId == null }
                     val grouped = topLevel.map { parent ->
-                        val children = categories.filter { it.parentId == parent.id }
-                        CategoryGroup(parent, children)
+                        CategoryGroup(parent, categories.filter { it.parentId == parent.id })
                     }
                     _groupedCategoriesState.value = GroupedCategoriesState.Success(grouped)
-                }
-        }
-    }
-
-    fun loadCategoriesByType(type: String) {
-        viewModelScope.launch {
-            _categoriesState.value = CategoriesState.Loading
-            categoryRepository.getCategoriesByType(type)
-                .catch { e ->
-                    _categoriesState.value =
-                        CategoriesState.Error(e.message ?: "Failed to load categories")
-                }
-                .collectLatest { categories ->
-                    _categoriesState.value = CategoriesState.Success(categories)
                 }
         }
     }
@@ -81,26 +81,14 @@ class CategoryViewModel @Inject constructor(
     fun loadGroupedCategoriesByType(type: String) {
         viewModelScope.launch {
             _groupedCategoriesState.value = GroupedCategoriesState.Loading
-            categoryRepository.getCategoriesByType(type)
+            getCategoriesByTypeUseCase(type)
                 .catch { e ->
-                    _groupedCategoriesState.value =
-                        GroupedCategoriesState.Error(e.message ?: "Failed to load categories")
+                    _groupedCategoriesState.value = GroupedCategoriesState.Error(e.message ?: "Failed to load categories")
                 }
                 .collectLatest { categories ->
-                    println("=== All categories of type $type ===")
-                    categories.forEach { cat ->
-                        println("ID: ${cat.id}, Name: ${cat.name}, ParentID: ${cat.parentId}")
-                    }
-                    val topLevel = categories
-                        .filter { it.parentId == null }
-                        .distinctBy { it.name.lowercase().trim() } // Safety check\\
-
-                    println("=== Top level categories: ${topLevel.size} ===")
-                    topLevel.forEach { println("- ${it.name} (${it.id})") }
-
+                    val topLevel = categories.filter { it.parentId == null }.distinctBy { it.name.lowercase().trim() }
                     val grouped = topLevel.map { parent ->
-                        val children = categories.filter { it.parentId == parent.id }
-                        CategoryGroup(parent, children)
+                        CategoryGroup(parent, categories.filter { it.parentId == parent.id })
                     }
                     _groupedCategoriesState.value = GroupedCategoriesState.Success(grouped)
                 }
@@ -109,274 +97,67 @@ class CategoryViewModel @Inject constructor(
 
     fun addCategory(category: Category) {
         viewModelScope.launch {
-            categoryRepository.addCategory(category)
-                .fold(
-                    onSuccess = {
-                        loadAllCategories()
-                        loadGroupedCategories()
-                    },
-                    onFailure = { error ->
-                        _categoriesState.value = CategoriesState.Error(
-                            error.message ?: "Failed to add category"
-                        )
-                    }
-                )
+            addCategoryUseCase(category).fold(
+                onSuccess = {
+                    loadAllCategories()
+                    loadGroupedCategories()
+                },
+                onFailure = { error ->
+                    _categoriesState.value = CategoriesState.Error(error.message ?: "Failed to add category")
+                }
+            )
         }
     }
 
     fun createDefaultCategories() {
         viewModelScope.launch {
-            val userId = "current_user_id" // Replace with actual user ID
-
-            // Top-level categories
             val topLevelCategories = listOf(
-                Category(name = "Food & Drinks", type = "expense", userId = userId),
-                Category(name = "Transportation", type = "expense", userId = userId),
-                Category(name = "Shopping", type = "expense", userId = userId),
-                Category(name = "Bills & Utilities", type = "expense", userId = userId),
-                Category(name = "Entertainment", type = "expense", userId = userId),
-                Category(name = "Healthcare", type = "expense", userId = userId),
-                Category(name = "Salary", type = "income", userId = userId),
-                Category(name = "Freelance", type = "income", userId = userId),
-                Category(name = "Investment", type = "income", userId = userId),
-                Category(name = "Other Income", type = "income", userId = userId)
+                Category(name = "Ăn uống", type = "expense"),
+                Category(name = "Di chuyển", type = "expense"),
+                Category(name = "Mua sắm", type = "expense"),
+                Category(name = "Hóa đơn & Tiện ích", type = "expense"),
+                Category(name = "Giải trí", type = "expense"),
+                Category(name = "Sức khỏe", type = "expense"),
+                Category(name = "Lương", type = "income"),
+                Category(name = "Làm thêm", type = "income"),
+                Category(name = "Đầu tư", type = "income"),
+                Category(name = "Thu nhập khác", type = "income")
             )
 
-            // Add top-level categories first and store their IDs
             val categoryIds = mutableMapOf<String, String>()
             topLevelCategories.forEach { category ->
-                categoryRepository.addCategory(category).fold(
-                    onSuccess = { addedCategory ->
-                        categoryIds[category.name] = addedCategory.id
-                    },
-                    onFailure = { /* Handle error */ }
+                addCategoryUseCase(category).fold(
+                    onSuccess = { added -> categoryIds[category.name] = added.id },
+                    onFailure = { /* Non-fatal */ }
                 )
             }
 
-            // Wait a bit for Firebase to process
             kotlinx.coroutines.delay(500)
 
-            // Now add subcategories
             val subcategories = listOf(
-                // Food & Drinks subcategories
-                Category(
-                    name = "Restaurants",
-                    type = "expense",
-                    userId = userId,
-                    parentId = categoryIds["Food & Drinks"]
-                ),
-                Category(
-                    name = "Groceries",
-                    type = "expense",
-                    userId = userId,
-                    parentId = categoryIds["Food & Drinks"]
-                ),
-                Category(
-                    name = "Coffee & Tea",
-                    type = "expense",
-                    userId = userId,
-                    parentId = categoryIds["Food & Drinks"]
-                ),
-                Category(
-                    name = "Fast Food",
-                    type = "expense",
-                    userId = userId,
-                    parentId = categoryIds["Food & Drinks"]
-                ),
-
-                // Transportation subcategories
-                Category(
-                    name = "Fuel",
-                    type = "expense",
-                    userId = userId,
-                    parentId = categoryIds["Transportation"]
-                ),
-                Category(
-                    name = "Public Transit",
-                    type = "expense",
-                    userId = userId,
-                    parentId = categoryIds["Transportation"]
-                ),
-                Category(
-                    name = "Taxi/Ride Share",
-                    type = "expense",
-                    userId = userId,
-                    parentId = categoryIds["Transportation"]
-                ),
-                Category(
-                    name = "Parking",
-                    type = "expense",
-                    userId = userId,
-                    parentId = categoryIds["Transportation"]
-                ),
-
-                // Shopping subcategories
-                Category(
-                    name = "Clothing",
-                    type = "expense",
-                    userId = userId,
-                    parentId = categoryIds["Shopping"]
-                ),
-                Category(
-                    name = "Electronics",
-                    type = "expense",
-                    userId = userId,
-                    parentId = categoryIds["Shopping"]
-                ),
-                Category(
-                    name = "Home & Garden",
-                    type = "expense",
-                    userId = userId,
-                    parentId = categoryIds["Shopping"]
-                ),
-                Category(
-                    name = "Personal Care",
-                    type = "expense",
-                    userId = userId,
-                    parentId = categoryIds["Shopping"]
-                ),
-
-                // Bills & Utilities subcategories
-                Category(
-                    name = "Electricity",
-                    type = "expense",
-                    userId = userId,
-                    parentId = categoryIds["Bills & Utilities"]
-                ),
-                Category(
-                    name = "Water",
-                    type = "expense",
-                    userId = userId,
-                    parentId = categoryIds["Bills & Utilities"]
-                ),
-                Category(
-                    name = "Gas",
-                    type = "expense",
-                    userId = userId,
-                    parentId = categoryIds["Bills & Utilities"]
-                ),
-                Category(
-                    name = "Internet",
-                    type = "expense",
-                    userId = userId,
-                    parentId = categoryIds["Bills & Utilities"]
-                ),
-                Category(
-                    name = "Phone",
-                    type = "expense",
-                    userId = userId,
-                    parentId = categoryIds["Bills & Utilities"]
-                ),
-                Category(
-                    name = "Rent/Mortgage",
-                    type = "expense",
-                    userId = userId,
-                    parentId = categoryIds["Bills & Utilities"]
-                ),
-
-                // Entertainment subcategories
-                Category(
-                    name = "Movies & TV",
-                    type = "expense",
-                    userId = userId,
-                    parentId = categoryIds["Entertainment"]
-                ),
-                Category(
-                    name = "Games",
-                    type = "expense",
-                    userId = userId,
-                    parentId = categoryIds["Entertainment"]
-                ),
-                Category(
-                    name = "Sports",
-                    type = "expense",
-                    userId = userId,
-                    parentId = categoryIds["Entertainment"]
-                ),
-                Category(
-                    name = "Hobbies",
-                    type = "expense",
-                    userId = userId,
-                    parentId = categoryIds["Entertainment"]
-                ),
-
-                // Healthcare subcategories
-                Category(
-                    name = "Doctor",
-                    type = "expense",
-                    userId = userId,
-                    parentId = categoryIds["Healthcare"]
-                ),
-                Category(
-                    name = "Pharmacy",
-                    type = "expense",
-                    userId = userId,
-                    parentId = categoryIds["Healthcare"]
-                ),
-                Category(
-                    name = "Insurance",
-                    type = "expense",
-                    userId = userId,
-                    parentId = categoryIds["Healthcare"]
-                ),
-                Category(
-                    name = "Dental",
-                    type = "expense",
-                    userId = userId,
-                    parentId = categoryIds["Healthcare"]
-                ),
-
-                // Salary subcategories
-                Category(
-                    name = "Base Salary",
-                    type = "income",
-                    userId = userId,
-                    parentId = categoryIds["Salary"]
-                ),
-                Category(
-                    name = "Bonus",
-                    type = "income",
-                    userId = userId,
-                    parentId = categoryIds["Salary"]
-                ),
-                Category(
-                    name = "Overtime",
-                    type = "income",
-                    userId = userId,
-                    parentId = categoryIds["Salary"]
-                ),
-
-                // Investment subcategories
-                Category(
-                    name = "Stocks",
-                    type = "income",
-                    userId = userId,
-                    parentId = categoryIds["Investment"]
-                ),
-                Category(
-                    name = "Dividends",
-                    type = "income",
-                    userId = userId,
-                    parentId = categoryIds["Investment"]
-                ),
-                Category(
-                    name = "Real Estate",
-                    type = "income",
-                    userId = userId,
-                    parentId = categoryIds["Investment"]
-                ),
-                Category(
-                    name = "Interest",
-                    type = "income",
-                    userId = userId,
-                    parentId = categoryIds["Investment"]
-                )
+                Category(name = "Nhà hàng", type = "expense", parentId = categoryIds["Ăn uống"]),
+                Category(name = "Đi chợ", type = "expense", parentId = categoryIds["Ăn uống"]),
+                Category(name = "Cà phê & Trà", type = "expense", parentId = categoryIds["Ăn uống"]),
+                Category(name = "Đồ ăn nhanh", type = "expense", parentId = categoryIds["Ăn uống"]),
+                Category(name = "Đổ xăng", type = "expense", parentId = categoryIds["Di chuyển"]),
+                Category(name = "Phương tiện công cộng", type = "expense", parentId = categoryIds["Di chuyển"]),
+                Category(name = "Taxi/Xe ôm", type = "expense", parentId = categoryIds["Di chuyển"]),
+                Category(name = "Quần áo", type = "expense", parentId = categoryIds["Mua sắm"]),
+                Category(name = "Đồ điện tử", type = "expense", parentId = categoryIds["Mua sắm"]),
+                Category(name = "Tiền điện", type = "expense", parentId = categoryIds["Hóa đơn & Tiện ích"]),
+                Category(name = "Tiền nước", type = "expense", parentId = categoryIds["Hóa đơn & Tiện ích"]),
+                Category(name = "Internet", type = "expense", parentId = categoryIds["Hóa đơn & Tiện ích"]),
+                Category(name = "Phim ảnh & TV", type = "expense", parentId = categoryIds["Giải trí"]),
+                Category(name = "Trò chơi", type = "expense", parentId = categoryIds["Giải trí"]),
+                Category(name = "Khám bệnh", type = "expense", parentId = categoryIds["Sức khỏe"]),
+                Category(name = "Hiệu thuốc", type = "expense", parentId = categoryIds["Sức khỏe"]),
+                Category(name = "Lương cơ bản", type = "income", parentId = categoryIds["Lương"]),
+                Category(name = "Thưởng", type = "income", parentId = categoryIds["Lương"]),
+                Category(name = "Cổ phiếu", type = "income", parentId = categoryIds["Đầu tư"]),
+                Category(name = "Cổ tức", type = "income", parentId = categoryIds["Đầu tư"])
             )
 
-            subcategories.forEach { category ->
-                categoryRepository.addCategory(category)
-            }
-
+            subcategories.forEach { addCategoryUseCase(it) }
             loadAllCategories()
             loadGroupedCategories()
         }
@@ -384,14 +165,13 @@ class CategoryViewModel @Inject constructor(
 
     fun deleteCategory(categoryId: String) {
         viewModelScope.launch {
-            categoryRepository.deleteCategory(categoryId)
-                .fold(
-                    onSuccess = {
-                        loadAllCategories()
-                        loadGroupedCategories()
-                    },
-                    onFailure = { /* Handle error */ }
-                )
+            deleteCategoryUseCase(categoryId).fold(
+                onSuccess = {
+                    loadAllCategories()
+                    loadGroupedCategories()
+                },
+                onFailure = { /* Handle error */ }
+            )
         }
     }
 

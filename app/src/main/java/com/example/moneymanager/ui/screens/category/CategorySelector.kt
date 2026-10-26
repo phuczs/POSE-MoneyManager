@@ -41,7 +41,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.moneymanager.R
 import com.example.moneymanager.data.model.Category
 import com.example.moneymanager.ui.viewmodel.CategoryViewModel
 
@@ -78,13 +80,13 @@ fun CategorySelector(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Category",
+                    text = stringResource(R.string.action_category),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = selectedCategory?.name ?: "Select a category",
+                    text = selectedCategory?.name ?: stringResource(R.string.select_category),
                     style = MaterialTheme.typography.bodyLarge,
                     color = if (selectedCategory != null)
                         MaterialTheme.colorScheme.onSurface
@@ -114,7 +116,7 @@ fun CategorySelector(
                     .padding(bottom = 32.dp)
             ) {
                 Text(
-                    text = "Select Category",
+                    text = stringResource(R.string.select_category),
                     style = MaterialTheme.typography.headlineSmall,
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
@@ -132,7 +134,7 @@ fun CategorySelector(
                     }
                     is CategoryViewModel.GroupedCategoriesState.Error -> {
                         Text(
-                            text = "Error loading categories",
+                            text = stringResource(R.string.error_loading_categories),
                             color = MaterialTheme.colorScheme.error,
                             modifier = Modifier.padding(16.dp)
                         )
@@ -221,7 +223,7 @@ fun CategoryGroupItem(
                     )
                     if (group.subcategories.isNotEmpty()) {
                         Text(
-                            text = "Includes ${group.subcategories.size} subcategories",
+                            text = stringResource(R.string.includes_subcategories_format, group.subcategories.size),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -295,12 +297,12 @@ fun EmptyCategoryState() {
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = "No categories yet",
+            text = stringResource(R.string.no_categories_yet),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text(
-            text = "Create your first category to get started",
+            text = stringResource(R.string.create_first_category),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center

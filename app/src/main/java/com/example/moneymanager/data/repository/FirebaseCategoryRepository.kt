@@ -99,7 +99,7 @@ class FirebaseCategoryRepository @Inject constructor(
         val userId = getCurrentUserId()
         val listenerRegistration = categoriesCollection
             .whereEqualTo("userId", userId)
-            .whereEqualTo("parentId", null)
+            .whereEqualTo("parentId", parentId)
             .addSnapshotListener { snapshot, err ->
                 if (err != null) {
                     close(err)
@@ -129,6 +129,10 @@ class FirebaseCategoryRepository @Inject constructor(
     override suspend fun deleteCategory(categoryId: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val userId = getCurrentUserId()
+            val categoryDoc = categoriesCollection.document(categoryId).get().await()
+            if (!categoryDoc.exists() || categoryDoc.getString("userId") != userId) {
+                return@withContext Result.failure(Exception("Category not found or unauthorized"))
+            }
             val subcategoriesSnapshot = categoriesCollection
                 .whereEqualTo("userId", userId)
                 .whereEqualTo("parentId", categoryId)
@@ -147,13 +151,14 @@ class FirebaseCategoryRepository @Inject constructor(
     override suspend fun getCategoryById(categoryId: String): Result<Category> = withContext(
         Dispatchers.IO){
         try {
+            val userId = getCurrentUserId()
             val document = categoriesCollection.document(categoryId).get().await()
             val category = document.toObject(Category::class.java)
 
-            if (category != null) {
+            if (category != null && category.userId == userId) {
                 Result.success(category)
             } else {
-                Result.failure(Exception("Category not found"))
+                Result.failure(Exception("Category not found or unauthorized"))
             }
         } catch (e: Exception) {
             Result.failure(e)

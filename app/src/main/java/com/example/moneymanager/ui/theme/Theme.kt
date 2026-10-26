@@ -37,6 +37,7 @@ private val LightColorScheme = lightColorScheme(
 fun MoneyManagerTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = false,
+    customAccentColor: Color? = null,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
@@ -49,8 +50,19 @@ fun MoneyManagerTheme(
         else -> LightColorScheme
     }
 
+    // Apply custom accent color if user picked one
+    val finalColorScheme = if (customAccentColor != null) {
+        colorScheme.copy(
+            primary = customAccentColor,
+            primaryContainer = customAccentColor.copy(alpha = 0.2f),
+            onPrimaryContainer = customAccentColor
+        )
+    } else {
+        colorScheme
+    }
+
     MaterialTheme(
-        colorScheme = colorScheme,
+        colorScheme = finalColorScheme,
         typography = Typography,
         shapes = Shapes,
         content = content

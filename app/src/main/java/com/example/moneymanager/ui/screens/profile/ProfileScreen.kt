@@ -8,9 +8,11 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
@@ -22,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -31,6 +34,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.compose.ui.res.stringResource
+import com.example.moneymanager.R
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
@@ -38,6 +43,8 @@ import coil.request.ImageRequest
 import com.example.moneymanager.data.model.User
 import com.example.moneymanager.ui.theme.MediumGreen
 import com.example.moneymanager.ui.viewmodel.AuthViewModel
+import com.example.moneymanager.ui.viewmodel.SecurityViewModel
+import com.example.moneymanager.MainActivity
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -45,15 +52,23 @@ fun ProfileScreen(
     onNavigateToLogin: () -> Unit,
     onNavigateToBudgets: () -> Unit,
     authViewModel: AuthViewModel = hiltViewModel(),
+    securityViewModel: SecurityViewModel = hiltViewModel()
 ) {
     val authState by authViewModel.authState.collectAsStateWithLifecycle()
     val currentUser by authViewModel.currentUser.collectAsStateWithLifecycle(initialValue = null)
     val isNotificationsEnabled by authViewModel.isNotificationsEnabled.collectAsStateWithLifecycle(initialValue = true)
+    val isLockEnabled by securityViewModel.isLockEnabled.collectAsStateWithLifecycle()
+    val lockTimeoutMinutes by securityViewModel.lockTimeoutMinutes.collectAsStateWithLifecycle()
+    val isFlagSecureEnabled by securityViewModel.isFlagSecureEnabled.collectAsStateWithLifecycle()
 
     var showEditNameDialog by remember { mutableStateOf(false) }
     var showChangePasswordDialog by remember { mutableStateOf(false) }
     var showDeleteAccountDialog by remember { mutableStateOf(false) }
     var showImagePickerDialog by remember { mutableStateOf(false) }
+    var showLanguageDialog by remember { mutableStateOf(false) }
+    var showThemeDialog by remember { mutableStateOf(false) }
+    var showWidgetDialog by remember { mutableStateOf(false) }
+    var showTimeoutDialog by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
 
@@ -104,11 +119,20 @@ fun ProfileScreen(
         ProfileContent(
             user = currentUser,
             isNotificationsEnabled = isNotificationsEnabled,
+            isLockEnabled = isLockEnabled,
+            lockTimeoutMinutes = lockTimeoutMinutes,
+            isFlagSecureEnabled = isFlagSecureEnabled,
+            onToggleLock = { securityViewModel.setLockEnabled(it) },
+            onTimeoutClick = { showTimeoutDialog = true },
+            onToggleFlagSecure = { securityViewModel.setFlagSecureEnabled(it) },
             onEditNameClick = { showEditNameDialog = true },
             onChangePasswordClick = { showChangePasswordDialog = true },
             onDeleteAccountClick = { showDeleteAccountDialog = true },
             onSignOutClick = { authViewModel.signOut() },
             onNavigateToBudgets = onNavigateToBudgets,
+            onLanguageClick = { showLanguageDialog = true },
+            onThemeClick = { showThemeDialog = true },
+            onWidgetLayoutClick = { showWidgetDialog = true },
             onToggleNotifications = { enabled ->
                 if (enabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
@@ -126,6 +150,14 @@ fun ProfileScreen(
     }
 
     // --- Dialogs ---
+
+    if (showTimeoutDialog) {
+        LockTimeoutDialog(
+            currentTimeout = lockTimeoutMinutes,
+            onDismiss = { showTimeoutDialog = false },
+            onSelectTimeout = { securityViewModel.setLockTimeoutMinutes(it) }
+        )
+    }
 
     if (showEditNameDialog) {
         EditNameDialog(
@@ -164,6 +196,38 @@ fun ProfileScreen(
             onImageSelected = { imageUrl ->
                 authViewModel.updateProfilePhoto(imageUrl)
                 showImagePickerDialog = false
+            }
+        )
+    }
+    if (showLanguageDialog) {
+        LanguageSelectionDialog(
+            currentLanguage = authViewModel.currentLanguage.collectAsState(initial = "vi").value,
+            onDismiss = { showLanguageDialog = false },
+            onLanguageSelected = { languageCode ->
+                authViewModel.setAppLanguage(languageCode)
+                showLanguageDialog = false
+            }
+        )
+    }
+
+    if (showThemeDialog) {
+        ThemeSelectionDialog(
+            currentHex = authViewModel.accentColorHex.collectAsState(initial = "").value,
+            onDismiss = { showThemeDialog = false },
+            onColorSelected = { hexStr ->
+                authViewModel.setAccentColorHex(hexStr)
+                showThemeDialog = false
+            }
+        )
+    }
+
+    if (showWidgetDialog) {
+        WidgetLayoutDialog(
+            currentOrder = authViewModel.dashboardWidgetsOrder.collectAsState(initial = emptyList()).value,
+            onDismiss = { showWidgetDialog = false },
+            onOrderSaved = { newOrder ->
+                authViewModel.setDashboardWidgetsOrder(newOrder)
+                showWidgetDialog = false
             }
         )
     }
@@ -252,7 +316,7 @@ private fun ProfileHeader(
 
         // Name
         Text(
-            text = user?.displayName?.takeIf { it.isNotBlank() } ?: "No Name",
+            text = user?.displayName?.takeIf { it.isNotBlank() } ?: stringResource(R.string.no_name),
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground
@@ -271,64 +335,124 @@ private fun ProfileHeader(
 private fun ProfileContent(
     user: User?,
     isNotificationsEnabled: Boolean,
+    isLockEnabled: Boolean,
+    lockTimeoutMinutes: Int,
+    isFlagSecureEnabled: Boolean,
+    onToggleLock: (Boolean) -> Unit,
+    onTimeoutClick: () -> Unit,
+    onToggleFlagSecure: (Boolean) -> Unit,
     onEditNameClick: () -> Unit,
     onChangePasswordClick: () -> Unit,
     onDeleteAccountClick: () -> Unit,
     onSignOutClick: () -> Unit,
+    onLanguageClick: () -> Unit,
+    onThemeClick: () -> Unit,
+    onWidgetLayoutClick: () -> Unit,
     onNavigateToBudgets: () -> Unit,
     onToggleNotifications: (Boolean) -> Unit
 ) {
     Column(
         modifier = Modifier.padding(horizontal = 16.dp)
     ) {
-        SectionHeader(title = "Account Settings")
+        SectionHeader(title = stringResource(R.string.account_settings))
 
         ProfileOption(
             icon = Icons.Default.Person,
-            title = "Edit Name",
-            subtitle = user?.displayName?.takeIf { it.isNotBlank() } ?: "Add your name",
+            title = stringResource(R.string.edit_name),
+            subtitle = user?.displayName?.takeIf { it.isNotBlank() } ?: stringResource(R.string.add_your_name),
             onClick = onEditNameClick
         )
 
         ProfileOption(
             icon = Icons.Default.Email,
-            title = "Email",
+            title = stringResource(R.string.email),
             subtitle = user?.email ?: "",
             onClick = null // Email cannot be changed easily
         )
 
         ProfileOption(
             icon = Icons.Default.Lock,
-            title = "Change Password",
-            subtitle = "Update your security",
+            title = stringResource(R.string.change_password),
+            subtitle = stringResource(R.string.update_security),
             onClick = onChangePasswordClick
         )
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        SectionHeader(title = "App Settings")
+        SectionHeader(title = stringResource(R.string.app_settings))
 
         // Notification Toggle
         ProfileToggleOption(
             icon = Icons.Default.Notifications,
-            title = "Notifications",
-            subtitle = if(isNotificationsEnabled) "Enabled" else "Disabled",
+            title = stringResource(R.string.notifications),
+            subtitle = if(isNotificationsEnabled) stringResource(R.string.enabled) else stringResource(R.string.disabled),
             isChecked = isNotificationsEnabled,
             onCheckedChange = onToggleNotifications
         )
 
         ProfileOption(
             icon = Icons.Default.Star,
-            title = "Budgets",
-            subtitle = "Manage your budgets",
+            title = stringResource(R.string.nav_budgets),
+            subtitle = stringResource(R.string.manage_your_budgets),
             onClick = onNavigateToBudgets
         )
 
         ProfileOption(
             icon = Icons.Default.Language,
-            title = "Language",
-            subtitle = "English (US)",
-            onClick = { /* TODO: Implement Language Selection */ }
+            title = stringResource(R.string.language),
+            subtitle = stringResource(R.string.language_options),
+            onClick = onLanguageClick
+        )
+
+        ProfileOption(
+            icon = Icons.Default.Palette,
+            title = stringResource(R.string.theme_color),
+            subtitle = stringResource(R.string.customize_accent_color),
+            onClick = onThemeClick
+        )
+
+        ProfileOption(
+            icon = Icons.Default.DashboardCustomize,
+            title = stringResource(R.string.dashboard_layout),
+            subtitle = stringResource(R.string.rearrange_widgets),
+            onClick = onWidgetLayoutClick
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // App Security Section
+        SectionHeader(title = stringResource(R.string.app_security))
+
+        ProfileToggleOption(
+            icon = Icons.Default.Security,
+            title = stringResource(R.string.app_lock),
+            subtitle = stringResource(R.string.app_lock_desc),
+            isChecked = isLockEnabled,
+            onCheckedChange = onToggleLock
+        )
+
+        if (isLockEnabled) {
+            val timeoutLabel = when (lockTimeoutMinutes) {
+                0 -> stringResource(R.string.lock_immediately)
+                1 -> stringResource(R.string.lock_1_min)
+                5 -> stringResource(R.string.lock_5_min)
+                15 -> stringResource(R.string.lock_15_min)
+                else -> "$lockTimeoutMinutes min"
+            }
+            ProfileOption(
+                icon = Icons.Default.Timer,
+                title = stringResource(R.string.lock_timeout),
+                subtitle = timeoutLabel,
+                onClick = onTimeoutClick
+            )
+        }
+
+        ProfileToggleOption(
+            icon = Icons.Default.VisibilityOff,
+            title = stringResource(R.string.hide_in_recents),
+            subtitle = stringResource(R.string.hide_in_recents_desc),
+            isChecked = isFlagSecureEnabled,
+            onCheckedChange = onToggleFlagSecure
         )
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -338,16 +462,16 @@ private fun ProfileContent(
 
         ProfileOption(
             icon = Icons.AutoMirrored.Filled.ExitToApp,
-            title = "Sign Out",
-            subtitle = "Sign out of your account",
+            title = stringResource(R.string.sign_out),
+            subtitle = stringResource(R.string.sign_out_desc),
             onClick = onSignOutClick,
             isWarning = false
         )
 
         ProfileOption(
             icon = Icons.Default.DeleteForever,
-            title = "Delete Account",
-            subtitle = "Permanently delete your account and data",
+            title = stringResource(R.string.delete_account),
+            subtitle = stringResource(R.string.delete_account_desc),
             onClick = onDeleteAccountClick,
             isWarning = true
         )
@@ -475,6 +599,57 @@ private fun ProfileOption(
 // --- Dialogs Implementations ---
 
 @Composable
+private fun LockTimeoutDialog(
+    currentTimeout: Int,
+    onDismiss: () -> Unit,
+    onSelectTimeout: (Int) -> Unit
+) {
+    val options = listOf(
+        0 to stringResource(R.string.lock_immediately),
+        1 to stringResource(R.string.lock_1_min),
+        5 to stringResource(R.string.lock_5_min),
+        15 to stringResource(R.string.lock_15_min)
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.lock_timeout)) },
+        text = {
+            Column {
+                options.forEach { (minutes, label) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                onSelectTimeout(minutes)
+                                onDismiss()
+                            }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = currentTimeout == minutes,
+                            onClick = {
+                                onSelectTimeout(minutes)
+                                onDismiss()
+                            },
+                            colors = RadioButtonDefaults.colors(selectedColor = MediumGreen)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = label, style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        }
+    )
+}
+
+@Composable
 private fun EditNameDialog(
     currentName: String,
     onDismiss: () -> Unit,
@@ -484,12 +659,12 @@ private fun EditNameDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Edit Name") },
+        title = { Text(stringResource(R.string.edit_name)) },
         text = {
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
-                label = { Text("Display Name") },
+                label = { Text(stringResource(R.string.display_name)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -502,12 +677,12 @@ private fun EditNameDialog(
                     }
                 }
             ) {
-                Text("Save")
+                Text(stringResource(R.string.save))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.cancel))
             }
         }
     )
@@ -525,13 +700,13 @@ private fun ChangePasswordDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Change Password") },
+        title = { Text(stringResource(R.string.change_password)) },
         text = {
             Column {
                 OutlinedTextField(
                     value = currentPassword,
                     onValueChange = { currentPassword = it },
-                    label = { Text("Current Password") },
+                    label = { Text(stringResource(R.string.current_password)) },
                     visualTransformation = PasswordVisualTransformation(),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
@@ -542,7 +717,7 @@ private fun ChangePasswordDialog(
                 OutlinedTextField(
                     value = newPassword,
                     onValueChange = { newPassword = it },
-                    label = { Text("New Password") },
+                    label = { Text(stringResource(R.string.new_password)) },
                     visualTransformation = PasswordVisualTransformation(),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
@@ -556,7 +731,7 @@ private fun ChangePasswordDialog(
                         confirmPassword = it
                         showError = false
                     },
-                    label = { Text("Confirm Password") },
+                    label = { Text(stringResource(R.string.confirm_password)) },
                     visualTransformation = PasswordVisualTransformation(),
                     singleLine = true,
                     isError = showError,
@@ -565,7 +740,7 @@ private fun ChangePasswordDialog(
 
                 if (showError) {
                     Text(
-                        text = "Passwords do not match or too short (min 6 chars)",
+                        text = stringResource(R.string.password_mismatch),
                         color = MaterialTheme.colorScheme.error,
                         fontSize = 12.sp,
                         modifier = Modifier.padding(top = 4.dp)
@@ -583,12 +758,12 @@ private fun ChangePasswordDialog(
                     }
                 }
             ) {
-                Text("Change")
+                Text(stringResource(R.string.change))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.cancel))
             }
         }
     )
@@ -610,13 +785,13 @@ private fun DeleteAccountDialog(
         },
         title = {
             Text(
-                "Delete Account",
+                stringResource(R.string.delete_account),
                 color = MaterialTheme.colorScheme.error
             )
         },
         text = {
             Text(
-                "Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently lost.",
+                stringResource(R.string.are_you_sure_delete_account),
                 textAlign = TextAlign.Center
             )
         },
@@ -627,12 +802,12 @@ private fun DeleteAccountDialog(
                     containerColor = MaterialTheme.colorScheme.error
                 )
             ) {
-                Text("Delete")
+                Text(stringResource(R.string.delete))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.cancel))
             }
         }
     )
@@ -647,22 +822,22 @@ private fun ImagePickerDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Update Profile Photo") },
+        title = { Text(stringResource(R.string.update_profile_photo)) },
         text = {
             Column {
-                Text("Enter an image URL:")
+                Text(stringResource(R.string.enter_image_url))
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
                     value = imageUrl,
                     onValueChange = { imageUrl = it },
-                    label = { Text("Image URL") },
+                    label = { Text(stringResource(R.string.image_url)) },
                     placeholder = { Text("https://example.com/image.jpg") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Note: For real implementation, integrate with system image picker.",
+                    text = stringResource(R.string.image_url_note),
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
@@ -676,13 +851,215 @@ private fun ImagePickerDialog(
                     }
                 }
             ) {
-                Text("Save")
+                Text(stringResource(R.string.save))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.cancel))
             }
+        }
+    )
+}
+@Composable
+fun LanguageSelectionDialog(
+    currentLanguage: String,
+    onDismiss: () -> Unit,
+    onLanguageSelected: (String) -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(24.dp),
+        title = { 
+            Text(
+                text = stringResource(R.string.select_language_title),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            ) 
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                LanguageOption(
+                    label = "Tiếng Việt",
+                    flag = "🇻🇳",
+                    isSelected = currentLanguage == "vi",
+                    onClick = { onLanguageSelected("vi") }
+                )
+                LanguageOption(
+                    label = "English",
+                    flag = "🇺🇸",
+                    isSelected = currentLanguage == "en",
+                    onClick = { onLanguageSelected("en") }
+                )
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+        }
+    )
+}
+
+@Composable
+private fun LanguageOption(
+    label: String,
+    flag: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val backgroundColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
+    val contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(backgroundColor)
+            .clickable(onClick = onClick)
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(text = flag, fontSize = 24.sp)
+        Spacer(modifier = Modifier.width(16.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = contentColor,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+            modifier = Modifier.weight(1f)
+        )
+        if (isSelected) {
+            Icon(
+                imageVector = Icons.Default.Check,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
+}
+
+@Composable
+fun ThemeSelectionDialog(
+    currentHex: String,
+    onDismiss: () -> Unit,
+    onColorSelected: (String) -> Unit
+) {
+    val predefinedColors = listOf(
+        Pair("Green (Default)", "#00796B"), // MediumGreen
+        Pair("Violet", "#7F3DFF"), // Primary original
+        Pair("Blue", "#2196F3"),
+        Pair("Crimson", "#E91E63"),
+        Pair("Orange", "#FF9800"),
+        Pair("Teal", "#009688")
+    )
+    
+    // Fallback if empty config is found, match to green.
+    val actualCurrentHex = if(currentHex.isBlank()) "#00796B" else currentHex
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.choose_accent_color)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                predefinedColors.forEach { (name, hex) ->
+                    val color = androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(hex))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onColorSelected(hex) }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(color)
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Text(
+                            text = name,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = if (hex == actualCurrentHex) FontWeight.Bold else FontWeight.Normal,
+                            color = if (hex == actualCurrentHex) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                        )
+                        if (hex == actualCurrentHex) {
+                            Spacer(modifier = Modifier.weight(1f))
+                            Icon(Icons.Default.Check, contentDescription = "Selected", tint = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) }
+        }
+    )
+}
+
+@Composable
+fun WidgetLayoutDialog(
+    currentOrder: List<String>,
+    onDismiss: () -> Unit,
+    onOrderSaved: (List<String>) -> Unit
+) {
+    val availableWidgets = listOf("AiInsight", "Overview", "RecentTransactions")
+    val widgetNames = mapOf(
+        "AiInsight" to "AI Monthly Insight",
+        "Overview" to "Spending Pie Chart",
+        "RecentTransactions" to "Recent Transactions List"
+    )
+
+    var workingOrder by remember { mutableStateOf(currentOrder) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.dashboard_widgets)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = stringResource(R.string.select_widgets_to_show),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                availableWidgets.forEach { widgetKey ->
+                    val isChecked = workingOrder.contains(widgetKey)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable {
+                                workingOrder = if (isChecked) {
+                                    workingOrder.filter { it != widgetKey }
+                                } else {
+                                    workingOrder + widgetKey
+                                }
+                            }
+                            .padding(8.dp)
+                    ) {
+                        Checkbox(
+                            checked = isChecked,
+                            onCheckedChange = null
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = widgetNames[widgetKey] ?: widgetKey,
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onOrderSaved(workingOrder) }) {
+                Text(stringResource(R.string.save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         }
     )
 }

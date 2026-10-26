@@ -3,29 +3,35 @@ package com.example.moneymanager.ui.viewmodel
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.moneymanager.data.model.ChatMessage
-import com.example.moneymanager.data.repository.BudgetRepository
-import com.example.moneymanager.data.repository.OllamaRepository
-import com.example.moneymanager.data.repository.TransactionRepository
+import com.example.moneymanager.domain.model.ChatMessage
+import com.example.moneymanager.domain.repository.AiServiceRepository
+import com.example.moneymanager.domain.repository.AuthRepository
+import com.example.moneymanager.domain.repository.ChatHistoryRepository
+import com.example.moneymanager.domain.repository.SettingsRepository
+import com.example.moneymanager.domain.usecase.budget.GetBudgetsUseCase
+import com.example.moneymanager.domain.usecase.transaction.GetAllTransactionsUseCase
 import com.example.moneymanager.util.PromptUtils
 import com.example.moneymanager.util.toCurrencyString
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import java.time.LocalDate
-import java.util.Date
 import java.util.UUID
 import javax.inject.Inject
 
 @HiltViewModel
 class ChatViewModel @Inject constructor(
-    private val ollamaRepository: OllamaRepository,
-    private val transactionRepository: TransactionRepository,
-    private val budgetRepository: BudgetRepository
+    private val aiServiceRepository: AiServiceRepository,
+    private val getAllTransactionsUseCase: GetAllTransactionsUseCase,
+    private val getBudgetsUseCase: GetBudgetsUseCase,
+    private val settingsRepository: SettingsRepository,
+    private val chatHistoryRepository: ChatHistoryRepository,
+    private val authRepository: AuthRepository
 ) : ViewModel() {
 
     private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
@@ -34,11 +40,39 @@ class ChatViewModel @Inject constructor(
     private val _chatState = MutableStateFlow<ChatUiState>(ChatUiState.Loading)
     val chatState: StateFlow<ChatUiState> = _chatState.asStateFlow()
 
-    // Biến lưu ngữ cảnh tài chính để AI biết tình hình của bạn
     private var financialContextPrompt: String = ""
+    private var currentUserId: String = "local_user"
 
     init {
-        initializeFinancialContext()
+        observeUserAndHistory()
+    }
+
+    private fun observeUserAndHistory() {
+        viewModelScope.launch {
+            authRepository.currentUser.collectLatest { user ->
+                currentUserId = user?.id ?: "local_user"
+                loadChatHistory(currentUserId)
+                initializeFinancialContext()
+            }
+        }
+    }
+
+    private fun loadChatHistory(userId: String) {
+        viewModelScope.launch {
+            chatHistoryRepository.getMessages(userId).collectLatest { persistedMessages ->
+                if (persistedMessages.isEmpty()) {
+                    val currentLanguage = settingsRepository.currentLanguage.value
+                    val welcomeText = if (currentLanguage == "vi")
+                        "Xin chào! Tôi là trợ lý tài chính của bạn. Dựa trên dữ liệu tháng này, tôi có thể giúp gì cho bạn?"
+                    else
+                        "Hello! I am your financial assistant. Based on this month's data, how can I help you?"
+                    val initialMessage = ChatMessage(content = welcomeText, isFromUser = false)
+                    chatHistoryRepository.saveMessage(userId, initialMessage)
+                } else {
+                    _messages.value = persistedMessages
+                }
+            }
+        }
     }
 
     private fun initializeFinancialContext() {
@@ -46,18 +80,17 @@ class ChatViewModel @Inject constructor(
             _chatState.value = ChatUiState.Loading
 
             try {
-                // 1. Lấy dữ liệu tổng quan (Timeout 3s)
                 val allTransactions = withTimeoutOrNull(3000) {
-                    transactionRepository.getAllTransactions().first()
+                    getAllTransactionsUseCase().first()
                 } ?: emptyList()
                 val allBudgets = withTimeoutOrNull(3000) {
-                    budgetRepository.getBudgets(Date()).first()
+                    getBudgetsUseCase(System.currentTimeMillis()).first()
                 } ?: emptyList()
 
-                // 2. Tính toán số liệu cơ bản
                 val today = LocalDate.now()
                 val thisMonthTransactions = allTransactions.filter {
-                    val txDate = it.date.toDate().toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+                    val txDate = java.time.Instant.ofEpochMilli(it.date)
+                        .atZone(java.time.ZoneId.systemDefault()).toLocalDate()
                     txDate.month == today.month && txDate.year == today.year
                 }
 
@@ -68,47 +101,41 @@ class ChatViewModel @Inject constructor(
                 val expenseByCategory = thisMonthTransactions.filter { it.type == "expense" }
                     .groupBy { it.category }
                     .mapValues { entry -> entry.value.sumOf { it.amount } }
-                    .toList()
-                    .sortedByDescending { it.second }
-                    .take(3)
+                    .toList().sortedByDescending { it.second }.take(3)
                     .joinToString(", ") { "${it.first}: ${it.second.toCurrencyString()}" }
+
                 val budgetAnalysis = if (allBudgets.isNotEmpty()) {
                     val details = allBudgets.joinToString("\n") { budget ->
                         val spentForBudget = allTransactions.filter { tx ->
                             tx.category == budget.category &&
                                     tx.type == "expense" &&
-                                    tx.date.toDate() >= budget.startDate &&
-                                    tx.date.toDate() <= budget.endDate
+                                    tx.date >= budget.startDate &&
+                                    tx.date <= budget.endDate
                         }.sumOf { it.amount }
-
                         val percent = if (budget.allocatedAmount > 0) (spentForBudget / budget.allocatedAmount * 100).toInt() else 0
                         val status = when {
-                            percent >= 100 -> "VƯỢT QUÁ"
-                            percent >= 80 -> "Cảnh báo"
-                            else -> "An toàn"
+                            percent >= 100 -> "OVER BUDGET"
+                            percent >= 80  -> "Warning"
+                            else           -> "Safe"
                         }
-                        "- ${budget.category}: Đã tiêu ${spentForBudget.toCurrencyString()}/${budget.allocatedAmount.toCurrencyString()} ($percent% - $status)"
+                        "- ${budget.category}: ${spentForBudget.toCurrencyString()}/${budget.allocatedAmount.toCurrencyString()} ($percent% - $status)"
                     }
-                    "\nTÌNH HÌNH NGÂN SÁCH:\n$details"
+                    "\nBUDGET STATUS:\n$details"
                 } else {
-                    "\nTÌNH HÌNH NGÂN SÁCH: Chưa thiết lập ngân sách."
+                    "\nBUDGET STATUS: No budgets configured."
                 }
 
-                // 3. Tạo ngữ cảnh cho AI
+                val currentLanguage = settingsRepository.currentLanguage.value
                 financialContextPrompt = PromptUtils.getFinancialAdvisorPrompt(
-                    totalIncome, totalExpense, balance, expenseByCategory, budgetAnalysis
+                    totalIncome, totalExpense, balance, expenseByCategory, budgetAnalysis,
+                    languageCode = currentLanguage
                 )
 
                 _chatState.value = ChatUiState.Success
 
-                // Tin nhắn chào mừng
-                val welcomeText = "Xin chào! Tôi là trợ lý tài chính của bạn. Dựa trên dữ liệu tháng này, tôi có thể giúp gì cho bạn?"
-                addMessage(ChatMessage(content = welcomeText, isFromUser = false))
-
             } catch (e: Exception) {
-                Log.e("ChatViewModel", "Lỗi khởi tạo: ${e.message}", e)
+                Log.e("ChatViewModel", "Context init error: ${e.message}", e)
                 _chatState.value = ChatUiState.Success
-                addMessage(ChatMessage(content = "Hệ thống đã sẵn sàng. Mời bạn đặt câu hỏi.", isFromUser = false))
             }
         }
     }
@@ -116,46 +143,57 @@ class ChatViewModel @Inject constructor(
     fun sendMessage(messageContent: String) {
         if (messageContent.isBlank()) return
 
-        // 1. Hiện tin nhắn người dùng (isFromUser = true)
         val userMessage = ChatMessage(content = messageContent, isFromUser = true)
-        addMessage(userMessage)
+        viewModelScope.launch {
+            chatHistoryRepository.saveMessage(currentUserId, userMessage)
+        }
 
-        // 2. Hiện loading message
         val loadingMessageId = UUID.randomUUID().toString()
-        addMessage(ChatMessage(id = loadingMessageId, content = "", isFromUser = false, isLoading = true))
+        val tempMessages = _messages.value + ChatMessage(id = loadingMessageId, content = "", isFromUser = false, isLoading = true)
+        _messages.value = tempMessages
 
         viewModelScope.launch {
             try {
-                // 3. Tạo Prompt chuyên cho việc TƯ VẤN (Advisor Prompt)
-                val prompt = PromptUtils.getChatAdvisorPrompt(financialContextPrompt, messageContent)
+                val currentLanguage = settingsRepository.currentLanguage.value
+                val prompt = PromptUtils.getChatAdvisorPrompt(
+                    financialContextPrompt, messageContent, languageCode = currentLanguage
+                )
 
+                val result = aiServiceRepository.queryAi(prompt, jsonMode = false)
 
-                // Gọi API với jsonMode = false (để nhận văn bản thường)
-                val result = ollamaRepository.sendMessage(prompt, jsonMode = false)
-
-                removeMessage(loadingMessageId)
-
+                removeLoadingMessage(loadingMessageId)
                 result.fold(
                     onSuccess = { responseText ->
-                        // Hiển thị trực tiếp câu trả lời của AI
-                        addMessage(ChatMessage(content = responseText.trim(), isFromUser = false))
+                        val aiMessage = ChatMessage(content = responseText.trim(), isFromUser = false)
+                        chatHistoryRepository.saveMessage(currentUserId, aiMessage)
                     },
                     onFailure = { error ->
-                        addMessage(ChatMessage(content = "Lỗi kết nối: ${error.message}", isFromUser = false, isError = true))
+                        val errMessage = ChatMessage(content = "Connection error: ${error.message}", isFromUser = false, isError = true)
+                        chatHistoryRepository.saveMessage(currentUserId, errMessage)
                     }
                 )
             } catch (e: Exception) {
-                removeMessage(loadingMessageId)
-                addMessage(ChatMessage(content = "Đã xảy ra lỗi: ${e.message}", isFromUser = false, isError = true))
+                removeLoadingMessage(loadingMessageId)
+                val errMessage = ChatMessage(content = "Error: ${e.message}", isFromUser = false, isError = true)
+                chatHistoryRepository.saveMessage(currentUserId, errMessage)
             }
         }
     }
 
-    private fun addMessage(message: ChatMessage) {
-        _messages.value = _messages.value + message
+    fun clearHistory() {
+        viewModelScope.launch {
+            chatHistoryRepository.clearHistory(currentUserId)
+            val currentLanguage = settingsRepository.currentLanguage.value
+            val welcomeText = if (currentLanguage == "vi")
+                "Đã xóa lịch sử trò chuyện. Tôi có thể giúp gì cho bạn?"
+            else
+                "Chat history cleared. How can I help you?"
+            val initialMessage = ChatMessage(content = welcomeText, isFromUser = false)
+            chatHistoryRepository.saveMessage(currentUserId, initialMessage)
+        }
     }
 
-    private fun removeMessage(messageId: String) {
+    private fun removeLoadingMessage(messageId: String) {
         _messages.value = _messages.value.filter { it.id != messageId }
     }
 }

@@ -1,14 +1,8 @@
 package com.example.moneymanager.di
 
 import android.content.Context
-import com.example.moneymanager.data.repository.AuthRepository
-import com.example.moneymanager.data.repository.BudgetRepository
-import com.example.moneymanager.data.repository.CategoryRepository
-import com.example.moneymanager.data.repository.FirebaseAuthRepository
-import com.example.moneymanager.data.repository.FirebaseBudgetRepository
-import com.example.moneymanager.data.repository.FirebaseCategoryRepository
-import com.example.moneymanager.data.repository.FirebaseTransactionRepository
-import com.example.moneymanager.data.repository.TransactionRepository
+import com.example.moneymanager.data.local.AppDatabase
+import com.example.moneymanager.data.local.TransactionDao
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
@@ -24,6 +18,14 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
+/**
+ * Hilt module for Firebase infrastructure, Google Sign-In, and Room database.
+ *
+ * Clean Architecture note:
+ * - Repository bindings have been moved to [RepositoryModule], which uses
+ *   @Binds instead of @Provides for better efficiency.
+ * - This module is now strictly infrastructure — no business logic.
+ */
 @Module
 @InstallIn(SingletonComponent::class)
 object FirebaseModule {
@@ -45,7 +47,6 @@ object FirebaseModule {
                 .requestEmail()
                 .build()
         } catch (e: Exception) {
-            // Fallback configuration when google-services.json is not available
             GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                 .requestEmail()
                 .build()
@@ -53,36 +54,25 @@ object FirebaseModule {
         return GoogleSignIn.getClient(context, gso)
     }
 
-    @Provides
-    @Singleton
-    fun provideAuthRepository(auth: FirebaseAuth): AuthRepository {
-        return FirebaseAuthRepository(auth)
-    }
+    // ─── Room Database ────────────────────────────────────────────────────────
 
     @Provides
     @Singleton
-    fun provideTransactionRepository(
-        firestore: FirebaseFirestore,
-        auth: FirebaseAuth
-    ): TransactionRepository {
-        return FirebaseTransactionRepository(firestore, auth)
-    }
+    fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase =
+        AppDatabase.create(context)
 
     @Provides
     @Singleton
-    fun provideCategoryRepository(
-        firestore: FirebaseFirestore,
-        auth: FirebaseAuth
-    ): CategoryRepository {
-        return FirebaseCategoryRepository(firestore, auth)
-    }
+    fun provideTransactionDao(database: AppDatabase): TransactionDao =
+        database.transactionDao()
 
     @Provides
     @Singleton
-    fun provideBudgetRepository(
-        firestore: FirebaseFirestore,
-        auth: FirebaseAuth
-    ): BudgetRepository {
-        return FirebaseBudgetRepository(firestore, auth)
-    }
+    fun provideChatDao(database: AppDatabase): com.example.moneymanager.data.local.ChatDao =
+        database.chatDao()
+
+    @Provides
+    @Singleton
+    fun provideRecurringTransactionDao(database: AppDatabase): com.example.moneymanager.data.local.RecurringTransactionDao =
+        database.recurringTransactionDao()
 }

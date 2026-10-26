@@ -16,35 +16,48 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import com.example.moneymanager.R
 
 @Composable
 fun PasswordResetDialog(
     email: String,
     onEmailChange: (String) -> Unit,
     onDismiss: () -> Unit,
-    onConfirm: () -> Unit
+    onConfirm: () -> Unit,
+    errorMessage: String? = null
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Reset Password") },
+        title = { Text(stringResource(R.string.reset_password)) },
         text = {
             Column(
                 modifier = Modifier.padding(8.dp)
             ) {
-                Text("Enter your email address and we'll send you a link to reset your password.")
+                Text(stringResource(R.string.reset_password_desc))
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 OutlinedTextField(
                     value = email,
                     onValueChange = onEmailChange,
-                    label = { Text("Email") },
+                    label = { Text(stringResource(R.string.email)) },
                     modifier = Modifier.fillMaxWidth(),
+                    isError = errorMessage != null,
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Email,
                         imeAction = ImeAction.Done
                     )
                 )
+                
+                if (errorMessage != null) {
+                    Text(
+                        text = errorMessage,
+                        color = androidx.compose.material3.MaterialTheme.colorScheme.error,
+                        style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(start = 16.dp, top = 4.dp)
+                    )
+                }
             }
         },
         confirmButton = {
@@ -52,12 +65,12 @@ fun PasswordResetDialog(
                 onClick = onConfirm,
                 enabled = email.isNotEmpty()
             ) {
-                Text("Send Reset Link")
+                Text(stringResource(R.string.send_reset_link))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.cancel))
             }
         }
     )

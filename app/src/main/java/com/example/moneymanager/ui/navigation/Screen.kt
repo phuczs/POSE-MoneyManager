@@ -8,7 +8,10 @@ sealed class Screen(val route: String) {
     
     // Main app screens
     object Dashboard : Screen("dashboard_screen")
-    object Transactions : Screen("transactions_screen")
+    object Transactions : Screen("transactions_screen") {
+        const val routeWithArgs = "transactions_screen?tab={tab}"
+        fun createRoute(tab: String = "transactions"): String = "transactions_screen?tab=$tab"
+    }
     object AddTransaction : Screen("add_transaction_screen")
     object EditTransaction : Screen("edit_transaction_screen/{transactionId}") {
         fun createRoute(transactionId: String): String {
@@ -20,4 +23,5 @@ sealed class Screen(val route: String) {
     object Statistics : Screen("statistics")
     object Budgets : Screen("budgets_screen")
     object Chat : Screen("chat_screen")
+    object RecurringTransactions : Screen("recurring_transactions_screen")
 }

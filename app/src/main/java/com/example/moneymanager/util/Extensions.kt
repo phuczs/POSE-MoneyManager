@@ -14,7 +14,7 @@ fun Double.toCurrencyString(currencyCode: String = "VND"): String {
     val format = if (currencyCode.equals("USD", ignoreCase = true)) {
         NumberFormat.getCurrencyInstance(Locale.US)
     } else {
-        NumberFormat.getCurrencyInstance(Locale("vi", "VN"))
+        NumberFormat.getCurrencyInstance(Locale.Builder().setLanguage("vi").setRegion("VN").build())
     }
     return format.format(this)
 }

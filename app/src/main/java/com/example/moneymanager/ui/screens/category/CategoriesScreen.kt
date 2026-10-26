@@ -25,6 +25,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Category
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -35,6 +36,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.ui.res.stringResource
+import com.example.moneymanager.R
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -59,9 +62,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.moneymanager.data.model.Category
@@ -86,7 +91,7 @@ fun CategoriesScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {Text("Categories")},
+                title = {Text(stringResource(R.string.categories))},
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -120,13 +125,13 @@ fun CategoriesScreen(
                 FilterChip(
                     selected = selectedType == "expense",
                     onClick = { selectedType = "expense" },
-                    label = { Text("Expenses")},
+                    label = { Text(stringResource(R.string.expenses))},
                     modifier = Modifier.weight(1f)
                 )
                 FilterChip(
                     selected = selectedType == "income",
                     onClick = { selectedType = "income" },
-                    label = {Text("Incomes")},
+                    label = {Text(stringResource(R.string.incomes))},
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -154,7 +159,7 @@ fun CategoriesScreen(
                             Button(
                                 onClick = { categoryViewModel.loadGroupedCategoriesByType(selectedType)}
                             ) {
-                                Text("Retry")
+                                Text(stringResource(R.string.retry))
                             }
                         }
                     }
@@ -201,11 +206,13 @@ fun CategoriesScreen(
                 showAddCategoryDialog = false
                 selectedParentCategory = null
             },
-            onAddCategory = { name, type, parentId ->
+            onAddCategory = { name, type, icon, colorHex, parentId ->
                 categoryViewModel.addCategory(
                     Category(
                         name = name,
                         type = type,
+                        iconName = icon.takeIf { it.isNotBlank() },
+                        colorHex = colorHex.takeIf { it.isNotBlank() },
                         parentId = parentId
                     )
                 )
@@ -246,19 +253,24 @@ fun CategoryGroupCard(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.weight(1f)
                 ) {
+                    val groupColorHex = group.parent.colorHex ?: ""
+                    val groupColor = if (groupColorHex.isNotBlank()) {
+                        try { androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(groupColorHex)) } catch (e: Exception) { MaterialTheme.colorScheme.primary }
+                    } else MaterialTheme.colorScheme.primary
+
                     Box(
                         modifier = Modifier
                             .size(40.dp)
                             .background(
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                                color = groupColor.copy(alpha = 0.1f),
                                 shape = CircleShape
                             ),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = group.parent.name.first().toString(),
+                            text = group.parent.iconName ?: group.parent.name.first().toString(),
                             style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.primary
+                            color = groupColor
                         )
                     }
                     Spacer(modifier = Modifier.width(12.dp))
@@ -268,7 +280,7 @@ fun CategoryGroupCard(
                             style = MaterialTheme.typography.titleMedium
                         )
                         Text(
-                            text = "${group.subcategories.size} subcategories",
+                            text = stringResource(R.string.subcategories_count, group.subcategories.size),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -330,7 +342,7 @@ fun CategoryGroupCard(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "No subcategories yet",
+                                    text = stringResource(R.string.no_subcategories_yet),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -359,14 +371,25 @@ fun CategoryGroupCard(
                                             verticalAlignment = Alignment.CenterVertically,
                                             modifier = Modifier.weight(1f)
                                         ) {
+                                            val subColorHex = subcategory.colorHex ?: ""
+                                            val subColor = if (subColorHex.isNotBlank()) {
+                                                try { androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(subColorHex)) } catch(e: Exception) { MaterialTheme.colorScheme.primary }
+                                            } else MaterialTheme.colorScheme.primary
                                             Box(
                                                 modifier = Modifier
-                                                    .size(8.dp)
+                                                    .size(24.dp)
                                                     .background(
-                                                        color = MaterialTheme.colorScheme.primary,
+                                                        color = subColor.copy(alpha = 0.15f),
                                                         shape = CircleShape
-                                                    )
-                                            )
+                                                    ),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                if (subcategory.iconName != null) {
+                                                    Text(text = subcategory.iconName, fontSize = 12.sp)
+                                                } else {
+                                                    Box(modifier = Modifier.size(8.dp).background(subColor, CircleShape))
+                                                }
+                                            }
                                             Spacer(modifier = Modifier.width(12.dp))
                                             Text(
                                                 text = subcategory.name,
@@ -408,12 +431,9 @@ fun CategoryGroupCard(
                     tint = MaterialTheme.colorScheme.error
                 )
             },
-            title = {Text("Delete category")},
+            title = {Text(stringResource(R.string.delete_category))},
             text = {
-                Text(
-                    "Are you sure you want to delete \"${categoryToDelete?.second}\"? " +
-                    "This action cannot be undone."
-                )
+                Text(stringResource(R.string.delete_category_confirm, categoryToDelete?.second ?: ""))
             },
             confirmButton = {
                 Button(
@@ -426,7 +446,7 @@ fun CategoryGroupCard(
                         containerColor = MaterialTheme.colorScheme.error
                     )
                 ) {
-                    Text("Delete")
+                    Text(stringResource(R.string.delete))
                 }
             },
             dismissButton = {
@@ -434,7 +454,7 @@ fun CategoryGroupCard(
                     showDeleteDialog = false
                     categoryToDelete = null
                 }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.cancel))
                 }
             }
         )
@@ -462,12 +482,12 @@ fun EmptyCategoriesView(
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = "No categories yet",
+            text = stringResource(R.string.no_categories_yet),
             style = MaterialTheme.typography.headlineSmall
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Get started by creating defaults categories or add your own",
+            text = stringResource(R.string.create_categories_desc),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
@@ -477,14 +497,14 @@ fun EmptyCategoriesView(
             onClick = onCreateDefaults,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Create default categories")
+            Text(stringResource(R.string.create_default_categories))
         }
         Spacer(modifier = Modifier.height(12.dp))
         OutlinedButton(
             onClick = onAddNew,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Add custom category")
+            Text(stringResource(R.string.add_custom_category))
         }
     }
 }
@@ -494,10 +514,16 @@ fun EmptyCategoriesView(
 fun AddCategoryDialog(
     parentCategory: Category? = null,
     onDismiss: () -> Unit,
-    onAddCategory: (name: String, type: String, parentId: String?) -> Unit
+    onAddCategory: (name: String, type: String, icon: String, colorHex: String, parentId: String?) -> Unit
 ) {
     var categoryName by remember { mutableStateOf("") }
     var categoryType by remember { mutableStateOf(parentCategory?.type ?: "expense") }
+    var categoryIcon by remember { mutableStateOf("") }
+    var categoryColor by remember { mutableStateOf("") }
+
+    val predefinedColors = listOf(
+        "#00796B", "#7F3DFF", "#2196F3", "#E91E63", "#FF9800", "#4CAF50"
+    )
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -513,8 +539,8 @@ fun AddCategoryDialog(
             ) {
                 Text(
                     text = if (parentCategory != null)
-                    "Add subcategory"
-                    else "Add new category",
+                    stringResource(R.string.add_subcategory)
+                    else stringResource(R.string.add_new_category),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
@@ -541,7 +567,7 @@ fun AddCategoryDialog(
                             Spacer(modifier = Modifier.width(8.dp))
                             Column {
                                 Text(
-                                    text = "Parent category",
+                                    text = stringResource(R.string.parent_category),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
@@ -558,27 +584,57 @@ fun AddCategoryDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                OutlinedTextField(
-                    value = categoryName,
-                    onValueChange = { categoryName = it },
-                    label = {Text("Category name")},
-                    placeholder = {
-                        Text(
-                            if (parentCategory != null)
-                                "e.g., Electricity, Gas, Water"
-                            else
-                                "e.g., Bills & Utilities"
-                        )
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = categoryIcon,
+                        onValueChange = { if (it.length <= 2) categoryIcon = it },
+                        label = { Text(stringResource(R.string.icon)) },
+                        placeholder = { Text("🍔") },
+                        modifier = Modifier.weight(0.3f),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = categoryName,
+                        onValueChange = { categoryName = it },
+                        label = { Text(stringResource(R.string.category_name)) },
+                        placeholder = {
+                            Text(
+                                if (parentCategory != null) stringResource(R.string.eg_electricity)
+                                else stringResource(R.string.eg_utilities)
+                            )
+                        },
+                        modifier = Modifier.weight(0.7f),
+                        singleLine = true
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Text(stringResource(R.string.pick_a_color), style = MaterialTheme.typography.labelMedium, modifier = Modifier.align(Alignment.Start))
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    predefinedColors.forEach { hex ->
+                        val color = androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(hex))
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(color)
+                                .clickable { categoryColor = hex }
+                                .let { if (categoryColor == hex) it.background(color.copy(alpha = 0.5f), CircleShape).padding(4.dp) else it }
+                        ) {
+                            if (categoryColor == hex) {
+                                Icon(Icons.Default.Check, contentDescription = "Selected", tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.align(Alignment.Center).size(16.dp))
+                            }
+                        }
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
                 if (parentCategory == null) {
                     Text(
-                        text = "Category type",
+                        text = stringResource(R.string.category_type),
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.align(Alignment.Start)
                     )
@@ -600,7 +656,7 @@ fun AddCategoryDialog(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = "Expense",
+                                text = stringResource(R.string.expense),
                                 style = MaterialTheme.typography.bodyLarge
                             )
                         }
@@ -616,7 +672,7 @@ fun AddCategoryDialog(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = "Income",
+                                text = stringResource(R.string.income),
                                 style = MaterialTheme.typography.bodyLarge
                             )
                         }
@@ -634,7 +690,7 @@ fun AddCategoryDialog(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "This will be an ${parentCategory.name} subcategory",
+                            text = stringResource(R.string.this_will_be_subcategory, parentCategory.name),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -648,18 +704,18 @@ fun AddCategoryDialog(
                     horizontalArrangement = Arrangement.End
                 ) {
                     TextButton(onClick = onDismiss) {
-                        Text("Cancel")
+                        Text(stringResource(R.string.cancel))
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
                         onClick = {
                             if (categoryName.isNotBlank()) {
-                                onAddCategory(categoryName, categoryType, parentCategory?.id)
+                                onAddCategory(categoryName, categoryType, categoryIcon, categoryColor, parentCategory?.id)
                             }
                         },
                         enabled = categoryName.isNotBlank()
                     ) {
-                        Text("Add")
+                        Text(stringResource(R.string.add))
                     }
                 }
             }

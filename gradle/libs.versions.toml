@@ -25,6 +25,10 @@ lifecycle = "2.7.0"
 vico = "1.13.1"
 coil = "2.5.0"
 google-play-services-auth = "20.7.0"
+room = "2.6.1"
+paging = "3.3.0"
+mockk = "1.13.10"
+coroutines-test = "1.7.3"
 
 [libraries]
 # --- Core & UI ---
@@ -72,12 +76,25 @@ vico-compose-m3 = { group = "com.patrykandpatrick.vico", name = "compose-m3", ve
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
 google-play-services-auth = { group = "com.google.android.gms", name = "play-services-auth", version.ref = "google-play-services-auth" }
 google-play-services-base = { group = "com.google.android.gms", name = "play-services-base", version.ref = "google-play-services-base" }
+
+# --- Room ---
+room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
+room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
+room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
+room-paging = { group = "androidx.room", name = "room-paging", version.ref = "room" }
+
+# --- Paging ---
+paging-runtime = { group = "androidx.paging", name = "paging-runtime", version.ref = "paging" }
+paging-compose = { group = "androidx.paging", name = "paging-compose", version.ref = "paging" }
+
 # --- Test Libraries ---
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
 androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
 androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
+mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
+coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines-test" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

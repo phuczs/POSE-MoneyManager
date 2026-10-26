@@ -2,22 +2,32 @@ package com.example.moneymanager.data.repository
 
 import android.os.Build
 import androidx.annotation.RequiresApi
+import com.example.moneymanager.data.mapper.toFirestoreMap
+import androidx.paging.PagingData
+import com.example.moneymanager.data.mapper.toTransactionDomain
 import com.example.moneymanager.data.model.Transaction
-import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
-import com.google.firebase.firestore.toObjects
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.tasks.await
 import java.time.YearMonth
-import java.util.Calendar
-import java.util.Date
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Legacy Firebase-only transaction repository.
+ *
+ * @deprecated Superseded by [OfflineFirstTransactionRepository].
+ * This class is kept only to satisfy the [TransactionRepository] interface while
+ * [OfflineFirstTransactionRepository] is wired as the primary binding in [RepositoryModule].
+ *
+ * All document deserialization uses [toTransactionDomain] instead of Firestore's `toObjects()`,
+ * because the domain [Transaction.date] is epoch-ms [Long] — not a Firebase [Timestamp].
+ */
 @Singleton
 class FirebaseTransactionRepository @Inject constructor(
     private val firestore: FirebaseFirestore,
@@ -26,27 +36,23 @@ class FirebaseTransactionRepository @Inject constructor(
 
     private val transactionsCollection = firestore.collection("transactions")
 
-    private fun getCurrentUserId(): String {
-        return auth.currentUser?.uid ?: throw IllegalStateException("User not authenticated")
-    }
+    private fun getCurrentUserId(): String =
+        auth.currentUser?.uid ?: throw IllegalStateException("User not authenticated")
 
     override fun getAllTransactions(): Flow<List<Transaction>> = callbackFlow {
         val userId = getCurrentUserId()
         val listenerRegistration = transactionsCollection
             .whereEqualTo("userId", userId)
+            .orderBy("date", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    close(error)
-                    return@addSnapshotListener
-                }
-
+                if (error != null) { close(error); return@addSnapshotListener }
                 if (snapshot != null) {
-                    val transactions = snapshot.toObjects(Transaction::class.java)
-                        .sortedByDescending { it.date.toDate() }
+                    val transactions = snapshot.documents.mapNotNull { doc ->
+                        doc.data?.toTransactionDomain(doc.id)
+                    }
                     trySend(transactions)
                 }
             }
-
         awaitClose { listenerRegistration.remove() }
     }
 
@@ -57,12 +63,11 @@ class FirebaseTransactionRepository @Inject constructor(
             .whereEqualTo("type", type)
             .orderBy("date", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    close(error)
-                    return@addSnapshotListener
-                }
+                if (error != null) { close(error); return@addSnapshotListener }
                 if (snapshot != null) {
-                    val transactions = snapshot.toObjects(Transaction::class.java)
+                    val transactions = snapshot.documents.mapNotNull { doc ->
+                        doc.data?.toTransactionDomain(doc.id)
+                    }
                     trySend(transactions)
                 }
             }
@@ -77,77 +82,66 @@ class FirebaseTransactionRepository @Inject constructor(
             .whereEqualTo("year", year)
             .orderBy("date", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    close(error)
-                    return@addSnapshotListener
-                }
+                if (error != null) { close(error); return@addSnapshotListener }
                 if (snapshot != null) {
-                    val transactions = snapshot.toObjects(Transaction::class.java)
+                    val transactions = snapshot.documents.mapNotNull { doc ->
+                        doc.data?.toTransactionDomain(doc.id)
+                    }
                     trySend(transactions)
                 }
             }
         awaitClose { listenerRegistration.remove() }
     }
 
-
     @RequiresApi(Build.VERSION_CODES.O)
-    override fun getTransactionsByTypeAndMonth(type: String, yearMonth: YearMonth): Flow<List<Transaction>> = callbackFlow {
+    override fun getTransactionsByTypeAndMonth(
+        type: String,
+        yearMonth: YearMonth
+    ): Flow<List<Transaction>> = callbackFlow {
         val userId = getCurrentUserId()
-        val month = yearMonth.monthValue
-        val year = yearMonth.year
-
         val listenerRegistration = transactionsCollection
             .whereEqualTo("userId", userId)
             .whereEqualTo("type", type)
-            .whereEqualTo("month", month)
-            .whereEqualTo("year", year)
+            .whereEqualTo("month", yearMonth.monthValue)
+            .whereEqualTo("year", yearMonth.year)
             .orderBy("date", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    close(error)
-                    return@addSnapshotListener
-                }
-                if (snapshot != null ) {
-                    val transactions = snapshot.toObjects(Transaction::class.java)
+                if (error != null) { close(error); return@addSnapshotListener }
+                if (snapshot != null) {
+                    val transactions = snapshot.documents.mapNotNull { doc ->
+                        doc.data?.toTransactionDomain(doc.id)
+                    }
                     trySend(transactions)
                 }
             }
         awaitClose { listenerRegistration.remove() }
     }
-
 
     override fun getRecentTransactions(limit: Int): Flow<List<Transaction>> = callbackFlow {
         val userId = getCurrentUserId()
         val listenerRegistration = transactionsCollection
             .whereEqualTo("userId", userId)
+            .orderBy("date", Query.Direction.DESCENDING)
+            .limit(limit.toLong())
             .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    close(error)
-                    return@addSnapshotListener
-                }
-
+                if (error != null) { close(error); return@addSnapshotListener }
                 if (snapshot != null) {
-                    val transactions = snapshot.toObjects(Transaction::class.java)
-                        .sortedByDescending { it.date.toDate() }
-                        .take(limit)
+                    val transactions = snapshot.documents.mapNotNull { doc ->
+                        doc.data?.toTransactionDomain(doc.id)
+                    }
                     trySend(transactions)
                 }
             }
-
         awaitClose { listenerRegistration.remove() }
     }
 
     override suspend fun addTransaction(transaction: Transaction): Result<Transaction> {
         return try {
             val userId = getCurrentUserId()
-            if (userId.isEmpty()) {
-                return Result.failure(Exception("User not authenticated"))
-            }
-            
             val newTransaction = transaction.copy(userId = userId)
             val documentRef = transactionsCollection.document()
             val transactionWithId = newTransaction.copy(id = documentRef.id)
-            documentRef.set(transactionWithId).await()
+            documentRef.set(transactionWithId.toFirestoreMap()).await()
             Result.success(transactionWithId)
         } catch (e: Exception) {
             Result.failure(e)
@@ -160,10 +154,14 @@ class FirebaseTransactionRepository @Inject constructor(
             if (transaction.id.isEmpty()) {
                 return Result.failure(IllegalArgumentException("Transaction ID cannot be empty"))
             }
-            
-            val updatedTransaction = transaction.copy(userId = userId)
-            transactionsCollection.document(transaction.id).set(updatedTransaction).await()
-            Result.success(updatedTransaction)
+            val doc = transactionsCollection.document(transaction.id).get().await()
+            if (!doc.exists() || doc.getString("userId") != userId) {
+                return Result.failure(Exception("Transaction not found or unauthorized"))
+            }
+            val updated = transaction.copy(userId = userId)
+            transactionsCollection.document(transaction.id)
+                .set(updated.toFirestoreMap()).await()
+            Result.success(updated)
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -171,6 +169,11 @@ class FirebaseTransactionRepository @Inject constructor(
 
     override suspend fun deleteTransaction(transactionId: String): Result<Unit> {
         return try {
+            val userId = getCurrentUserId()
+            val doc = transactionsCollection.document(transactionId).get().await()
+            if (!doc.exists() || doc.getString("userId") != userId) {
+                return Result.failure(Exception("Transaction not found or unauthorized"))
+            }
             transactionsCollection.document(transactionId).delete().await()
             Result.success(Unit)
         } catch (e: Exception) {
@@ -180,19 +183,25 @@ class FirebaseTransactionRepository @Inject constructor(
 
     override suspend fun getTransactionById(transactionId: String): Result<Transaction> {
         return try {
-            val document = transactionsCollection.document(transactionId).get().await()
-            if (document.exists()) {
-                val transaction = document.toObject(Transaction::class.java)
-                if (transaction != null) {
-                    Result.success(transaction)
-                } else {
-                    Result.failure(Exception("Failed to convert document to Transaction"))
-                }
+            val userId = getCurrentUserId()
+            val doc = transactionsCollection.document(transactionId).get().await()
+            val data = doc.data
+            if (doc.exists() && data != null && doc.getString("userId") == userId) {
+                Result.success(data.toTransactionDomain(doc.id))
             } else {
-                Result.failure(Exception("Transaction not found"))
+                Result.failure(Exception("Transaction not found or unauthorized"))
             }
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    @Deprecated("Use OfflineFirstTransactionRepository instead", level = DeprecationLevel.ERROR)
+    override fun getPagedTransactions(type: String?, month: Int?, year: Int?): Flow<PagingData<Transaction>> =
+        emptyFlow()
+
+    @Deprecated("Use OfflineFirstTransactionRepository instead", level = DeprecationLevel.ERROR)
+    override suspend fun clearLocalCacheForUser(userId: String) {
+        // No-op: FirebaseTransactionRepository has no local cache
     }
 }

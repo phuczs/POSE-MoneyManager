@@ -40,21 +40,31 @@ class FirebaseBudgetRepository @Inject constructor(
     }
 
     override suspend fun updateBudget(budget: Budget): Result<Unit> = try {
-        firestore.collection("budgets")
-            .document(budget.id)
-            .set(budget)
-            .await()
-        Result.success(Unit)
+        val doc = firestore.collection("budgets").document(budget.id).get().await()
+        if (!doc.exists() || doc.getString("userId") != userId) {
+            Result.failure(Exception("Budget not found or unauthorized"))
+        } else {
+            firestore.collection("budgets")
+                .document(budget.id)
+                .set(budget)
+                .await()
+            Result.success(Unit)
+        }
     } catch (e: Exception) {
         Result.failure(e)
     }
 
     override suspend fun deleteBudget(budgetId: String): Result<Unit> = try {
-        firestore.collection("budgets")
-            .document(budgetId)
-            .delete()
-            .await()
-        Result.success(Unit)
+        val doc = firestore.collection("budgets").document(budgetId).get().await()
+        if (!doc.exists() || doc.getString("userId") != userId) {
+            Result.failure(Exception("Budget not found or unauthorized"))
+        } else {
+            firestore.collection("budgets")
+                .document(budgetId)
+                .delete()
+                .await()
+            Result.success(Unit)
+        }
     } catch (e: Exception) {
         Result.failure(e)
     }

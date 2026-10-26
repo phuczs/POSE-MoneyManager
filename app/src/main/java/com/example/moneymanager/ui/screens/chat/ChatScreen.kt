@@ -13,6 +13,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -34,6 +35,8 @@ import com.example.moneymanager.ui.viewmodel.ChatViewModel
 // ============================
 import java.text.SimpleDateFormat
 import java.util.Locale
+import androidx.compose.ui.res.stringResource
+import com.example.moneymanager.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,6 +58,31 @@ fun ChatScreen(
         }
     }
 
+    var showClearDialog by remember { mutableStateOf(false) }
+
+    if (showClearDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearDialog = false },
+            title = { Text(stringResource(R.string.clear_chat_title)) },
+            text = { Text(stringResource(R.string.clear_chat_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.clearHistory()
+                        showClearDialog = false
+                    }
+                ) {
+                    Text(stringResource(R.string.clear), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearDialog = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
@@ -67,12 +95,21 @@ fun ChatScreen(
                             modifier = Modifier.size(24.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("AI Financial Advisor", fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.ai_financial_advisor), fontWeight = FontWeight.Bold)
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = onClose) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { showClearDialog = true }) {
+                        Icon(
+                            imageVector = Icons.Default.DeleteSweep,
+                            contentDescription = stringResource(R.string.clear_history),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
@@ -238,7 +275,7 @@ fun MessageInput(
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
-            placeholder = { Text("Hỏi tôi về tài chính của bạn...") },
+            placeholder = { Text(stringResource(R.string.ask_financial_advisor)) },
             modifier = Modifier
                 .weight(1f)
                 .padding(end = 8.dp),
@@ -267,7 +304,7 @@ fun MessageInput(
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.Send,
-                contentDescription = "Gửi",
+                contentDescription = stringResource(R.string.send),
                 tint = Color.White
             )
         }

@@ -45,6 +45,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import com.example.moneymanager.ui.screens.auth.AuthScreen
 import com.example.moneymanager.ui.screens.budget.BudgetScreen
 import com.example.moneymanager.ui.screens.category.CategoriesScreen
@@ -58,7 +60,8 @@ import com.example.moneymanager.ui.theme.TextGray
 import com.example.moneymanager.ui.viewmodel.AuthViewModel
 import com.example.moneymanager.ui.screens.chat.ChatScreen
 import com.example.moneymanager.ui.viewmodel.ChatViewModel // Đảm bảo đã import ViewModel này
-
+import androidx.compose.ui.res.stringResource
+import com.example.moneymanager.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,7 +70,8 @@ fun MainContainer(
     authViewModel: AuthViewModel = hiltViewModel()
 ) {
     val isAuthenticated by authViewModel.isAuthenticated.collectAsState(initial = false)
-    var selectedTabIndex by remember { mutableIntStateOf(0) }
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
 
     if (isAuthenticated) {
         Scaffold(
@@ -79,33 +83,40 @@ fun MainContainer(
                 ) {
                     // 1. Dashboard
                     NavBarItem(
-                        selected = selectedTabIndex == 0,
+                        selected = currentRoute == Screen.Dashboard.route,
                         onClick = {
-                            selectedTabIndex = 0
                             navController.navigate(Screen.Dashboard.route) {
-                                popUpTo(Screen.Dashboard.route) { inclusive = true }
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
                             }
                         },
                         icon = Icons.Default.Home,
-                        label = "Home"
+                        label = stringResource(R.string.nav_home)
                     )
 
                     // 2. Transactions
                     NavBarItem(
-                        selected = selectedTabIndex == 1,
+                        selected = currentRoute == Screen.Transactions.route || currentRoute?.startsWith("transactions_screen") == true,
                         onClick = {
-                            selectedTabIndex = 1
-                            navController.navigate(Screen.Transactions.route)
+                            navController.navigate(Screen.Transactions.route) {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
                         },
                         icon = Icons.Default.History,
-                        label = "Transactions"
+                        label = stringResource(R.string.nav_transactions)
                     )
 
                     // 3. VIVID ADD BUTTON (Center)
                     NavigationBarItem(
                         selected = false, // Never "selected" in the traditional sense
                         onClick = {
-                            selectedTabIndex = 2
                             navController.navigate(Screen.AddTransaction.route)
                         },
                         icon = {
@@ -120,7 +131,7 @@ fun MainContainer(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Add,
-                                    contentDescription = "Add Transaction",
+                                    contentDescription = stringResource(R.string.add_transaction),
                                     tint = Color.White,
                                     modifier = Modifier.size(32.dp) // Large Icon
                                 )
@@ -134,24 +145,34 @@ fun MainContainer(
 
                     // 4. Budgets
                     NavBarItem(
-                        selected = selectedTabIndex == 3,
+                        selected = currentRoute == Screen.Budgets.route,
                         onClick = {
-                            selectedTabIndex = 3
-                            navController.navigate(Screen.Budgets.route)
+                            navController.navigate(Screen.Budgets.route) {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
                         },
                         icon = Icons.Default.PieChart,
-                        label = "Budgets"
+                        label = stringResource(R.string.nav_budgets)
                     )
 
                     // 5. Profile
                     NavBarItem(
-                        selected = selectedTabIndex == 4,
+                        selected = currentRoute == Screen.Profile.route,
                         onClick = {
-                            selectedTabIndex = 4
-                            navController.navigate(Screen.Profile.route)
+                            navController.navigate(Screen.Profile.route) {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
                         },
                         icon = Icons.Default.Person,
-                        label = "Profile"
+                        label = stringResource(R.string.nav_profile)
                     )
                 }
             }
@@ -263,7 +284,28 @@ fun NavGraph(
                 onNavigateToAddTransaction = { navController.navigate(Screen.AddTransaction.route) },
                 onTransactionClick = { transactionId ->
                     navController.navigate(Screen.EditTransaction.createRoute(transactionId))
+                },
+                initialTab = "transactions"
+            )
+        }
+
+        composable(
+            route = Screen.Transactions.routeWithArgs,
+            arguments = listOf(
+                androidx.navigation.navArgument("tab") {
+                    defaultValue = "transactions"
+                    type = androidx.navigation.NavType.StringType
                 }
+            )
+        ) { backStackEntry ->
+            val tab = backStackEntry.arguments?.getString("tab") ?: "transactions"
+            TransactionsScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToAddTransaction = { navController.navigate(Screen.AddTransaction.route) },
+                onTransactionClick = { transactionId ->
+                    navController.navigate(Screen.EditTransaction.createRoute(transactionId))
+                },
+                initialTab = tab
             )
         }
 
@@ -295,6 +337,14 @@ fun NavGraph(
                     }
                 },
                 onNavigateToBudgets = { navController.navigate(Screen.Budgets.route) }
+            )
+        }
+
+        composable(Screen.RecurringTransactions.route) {
+            val recurringViewModel: com.example.moneymanager.ui.viewmodel.RecurringViewModel = hiltViewModel()
+            com.example.moneymanager.ui.screens.recurring.RecurringTransactionsScreen(
+                viewModel = recurringViewModel,
+                onBackClick = { navController.popBackStack() }
             )
         }
 

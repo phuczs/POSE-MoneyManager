@@ -29,6 +29,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -38,6 +41,8 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.moneymanager.ui.theme.*
 import com.example.moneymanager.ui.viewmodel.AuthViewModel
+import androidx.compose.ui.res.stringResource
+import com.example.moneymanager.R
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.common.api.ApiException
 
@@ -52,7 +57,10 @@ fun AuthScreen(
     authViewModel: AuthViewModel = hiltViewModel()
 ) {
     val authState by authViewModel.authState.collectAsState()
+    val currentLanguage by authViewModel.currentLanguage.collectAsState(initial = "vi")
     var currentTab by remember { mutableStateOf(AuthTab.LOGIN) }
+    var languageMenuExpanded by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     // Google Sign In Launcher
     val googleSignInLauncher = rememberLauncherForActivityResult(
@@ -70,14 +78,24 @@ fun AuthScreen(
         }
     )
 
+    val snackbarHostState = remember { SnackbarHostState() }
+    var showResetDialog by remember { mutableStateOf(false) }
+    var resetEmail by remember { mutableStateOf("") }
+    var resetEmailError by remember { mutableStateOf<String?>(null) }
+
     LaunchedEffect(authState) {
         if (authState is AuthViewModel.AuthState.Success) {
             onAuthSuccess()
+        } else if (authState is AuthViewModel.AuthState.PasswordResetSent) {
+            val message = context.getString(R.string.password_reset_sent)
+            snackbarHostState.showSnackbar(message)
+            authViewModel.resetState()
         }
     }
 
     Scaffold(
-        containerColor = BackgroundGray // From your Color.kt
+        containerColor = BackgroundGray, // From your Color.kt
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -114,16 +132,95 @@ fun AuthScreen(
                     }
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        text = "Money Saver",
+                        text = stringResource(R.string.app_name),
                         fontSize = 28.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
                     Text(
-                        text = "Your journey to financial freedom",
+                        text = stringResource(R.string.journey_financial_freedom),
                         fontSize = 14.sp,
                         color = Color.White.copy(alpha = 0.85f)
                     )
+                }
+
+                // Language Toggle Dropdown
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(16.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(Color.White.copy(alpha = 0.25f))
+                            .clickable { languageMenuExpanded = true }
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            text = if (currentLanguage == "vi") "🇻🇳" else "🇺🇸",
+                            fontSize = 16.sp
+                        )
+                        Text(
+                            text = currentLanguage.uppercase(),
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Icon(
+                            imageVector = Icons.Default.ArrowDropDown,
+                            contentDescription = "Dropdown",
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+
+                    DropdownMenu(
+                        expanded = languageMenuExpanded,
+                        onDismissRequest = { languageMenuExpanded = false },
+                        modifier = Modifier.background(Color.White)
+                    ) {
+                        DropdownMenuItem(
+                            text = {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Text("🇻🇳", fontSize = 20.sp)
+                                    Text(
+                                        "Tiếng Việt",
+                                        fontWeight = if (currentLanguage == "vi") FontWeight.Bold else FontWeight.Normal,
+                                        color = if (currentLanguage == "vi") MediumGreen else Color.Black
+                                    )
+                                }
+                            },
+                            onClick = {
+                                authViewModel.setAppLanguage("vi")
+                                languageMenuExpanded = false
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Text("🇺🇸", fontSize = 20.sp)
+                                    Text(
+                                        "English",
+                                        fontWeight = if (currentLanguage == "en") FontWeight.Bold else FontWeight.Normal,
+                                        color = if (currentLanguage == "en") MediumGreen else Color.Black
+                                    )
+                                }
+                            },
+                            onClick = {
+                                authViewModel.setAppLanguage("en")
+                                languageMenuExpanded = false
+                            }
+                        )
+                    }
                 }
             }
 
@@ -164,6 +261,11 @@ fun AuthScreen(
                         onGoogleClick = {
                             val signInIntent = authViewModel.getGoogleSignInClient().signInIntent
                             googleSignInLauncher.launch(signInIntent)
+                        },
+                        onForgotPassword = { email ->
+                            resetEmail = email
+                            resetEmailError = null
+                            showResetDialog = true
                         }
                     )
                     AuthTab.REGISTER -> RegisterContent(
@@ -196,6 +298,26 @@ fun AuthScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
         }
+        
+        if (showResetDialog) {
+            PasswordResetDialog(
+                email = resetEmail,
+                onEmailChange = { 
+                    resetEmail = it
+                    resetEmailError = null
+                },
+                onDismiss = { showResetDialog = false },
+                onConfirm = {
+                    if (android.util.Patterns.EMAIL_ADDRESS.matcher(resetEmail).matches()) {
+                        authViewModel.resetPassword(resetEmail)
+                        showResetDialog = false
+                    } else {
+                        resetEmailError = context.getString(R.string.invalid_email)
+                    }
+                },
+                errorMessage = resetEmailError
+            )
+        }
     }
 }
 
@@ -220,13 +342,13 @@ fun AuthTabSelector(
             verticalAlignment = Alignment.CenterVertically
         ) {
             TabButton(
-                text = "Log In",
+                text = stringResource(R.string.log_in),
                 isSelected = selectedTab == AuthTab.LOGIN,
                 modifier = Modifier.weight(1f),
                 onClick = { onTabSelected(AuthTab.LOGIN) }
             )
             TabButton(
-                text = "Sign Up",
+                text = stringResource(R.string.sign_up),
                 isSelected = selectedTab == AuthTab.REGISTER,
                 modifier = Modifier.weight(1f),
                 onClick = { onTabSelected(AuthTab.REGISTER) }
@@ -263,7 +385,8 @@ fun TabButton(
 fun LoginContent(
     authViewModel: AuthViewModel,
     isLoading: Boolean,
-    onGoogleClick: () -> Unit
+    onGoogleClick: () -> Unit,
+    onForgotPassword: (String) -> Unit
 ) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -273,7 +396,7 @@ fun LoginContent(
         EmeraldTextField(
             value = email,
             onValueChange = { email = it },
-            label = "Email Address",
+            label = stringResource(R.string.email_address),
             icon = Icons.Default.Email,
             keyboardType = KeyboardType.Email
         )
@@ -283,7 +406,7 @@ fun LoginContent(
         EmeraldTextField(
             value = password,
             onValueChange = { password = it },
-            label = "Password",
+            label = stringResource(R.string.password),
             icon = Icons.Default.Lock,
             keyboardType = KeyboardType.Password,
             isPassword = true,
@@ -294,21 +417,21 @@ fun LoginContent(
         Spacer(modifier = Modifier.height(12.dp))
 
         Text(
-            text = "Forgot Password?",
+            text = stringResource(R.string.forgot_password),
             color = MediumGreen,
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier
                 .align(Alignment.End)
                 .clickable {
-                    if(email.isNotEmpty()) authViewModel.resetPassword(email)
+                    onForgotPassword(email)
                 }
         )
 
         Spacer(modifier = Modifier.height(32.dp))
 
         EmeraldButton(
-            text = "Log In",
+            text = stringResource(R.string.log_in),
             isLoading = isLoading,
             onClick = { authViewModel.login(email, password) }
         )
@@ -332,12 +455,13 @@ fun RegisterContent(
     var passwordVisible by remember { mutableStateOf(false) }
     var confirmPasswordVisible by remember { mutableStateOf(false) }
     var errorText by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
 
     Column(modifier = Modifier.padding(horizontal = 24.dp)) {
         EmeraldTextField(
             value = email,
             onValueChange = { email = it },
-            label = "Email Address",
+            label = stringResource(R.string.email_address),
             icon = Icons.Default.Email,
             keyboardType = KeyboardType.Email
         )
@@ -347,7 +471,7 @@ fun RegisterContent(
         EmeraldTextField(
             value = password,
             onValueChange = { password = it },
-            label = "Password",
+            label = stringResource(R.string.password),
             icon = Icons.Default.Lock,
             keyboardType = KeyboardType.Password,
             isPassword = true,
@@ -360,7 +484,7 @@ fun RegisterContent(
         EmeraldTextField(
             value = confirmPassword,
             onValueChange = { confirmPassword = it },
-            label = "Confirm Password",
+            label = stringResource(R.string.confirm_password),
             icon = Icons.Default.Lock,
             keyboardType = KeyboardType.Password,
             isPassword = true,
@@ -380,14 +504,14 @@ fun RegisterContent(
         Spacer(modifier = Modifier.height(32.dp))
 
         EmeraldButton(
-            text = "Sign Up",
+            text = stringResource(R.string.sign_up),
             isLoading = isLoading,
             onClick = {
                 if (password == confirmPassword) {
                     errorText = null
                     authViewModel.register(email, password)
                 } else {
-                    errorText = "Passwords do not match"
+                    errorText = context.getString(R.string.passwords_do_not_match)
                 }
             }
         )
@@ -395,7 +519,7 @@ fun RegisterContent(
         Spacer(modifier = Modifier.height(24.dp))
 
         Text(
-            text = "By signing up, you agree to our Terms & Policy",
+            text = stringResource(R.string.terms_and_policy),
             color = TextGray,
             fontSize = 12.sp,
             textAlign = TextAlign.Center,
@@ -487,7 +611,7 @@ fun GoogleButton(onClick: () -> Unit) {
         colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White),
         border = androidx.compose.foundation.BorderStroke(1.dp, Color.LightGray)
     ) {
-        Text(" Sign in with Google", color = Color.Black, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+        Text(" " + stringResource(R.string.sign_in_google), color = Color.Black, fontSize = 16.sp, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -499,7 +623,7 @@ fun DividerWithText() {
     ) {
         HorizontalDivider(modifier = Modifier.weight(1f), color = Color.LightGray)
         Text(
-            text = "OR",
+            text = stringResource(R.string.or),
             color = TextGray,
             fontSize = 14.sp,
             fontWeight = FontWeight.Medium,
