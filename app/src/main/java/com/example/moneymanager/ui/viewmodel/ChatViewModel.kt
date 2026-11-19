@@ -3,11 +3,15 @@ package com.example.moneymanager.ui.viewmodel
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.moneymanager.data.local.AnomalyPreferences
 import com.example.moneymanager.domain.model.ChatMessage
+import com.example.moneymanager.domain.model.SmartReplyChip
 import com.example.moneymanager.domain.repository.AiServiceRepository
 import com.example.moneymanager.domain.repository.AuthRepository
 import com.example.moneymanager.domain.repository.ChatHistoryRepository
 import com.example.moneymanager.domain.repository.SettingsRepository
+import com.example.moneymanager.domain.usecase.ai.DetectTransactionAnomalyUseCase
+import com.example.moneymanager.domain.usecase.ai.GenerateSmartRepliesUseCase
 import com.example.moneymanager.domain.usecase.budget.GetBudgetsUseCase
 import com.example.moneymanager.domain.usecase.transaction.GetAllTransactionsUseCase
 import com.example.moneymanager.util.PromptUtils
@@ -31,7 +35,10 @@ class ChatViewModel @Inject constructor(
     private val getBudgetsUseCase: GetBudgetsUseCase,
     private val settingsRepository: SettingsRepository,
     private val chatHistoryRepository: ChatHistoryRepository,
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val generateSmartRepliesUseCase: GenerateSmartRepliesUseCase,
+    private val detectTransactionAnomalyUseCase: DetectTransactionAnomalyUseCase,
+    private val anomalyPreferences: AnomalyPreferences
 ) : ViewModel() {
 
     private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
@@ -39,6 +46,10 @@ class ChatViewModel @Inject constructor(
 
     private val _chatState = MutableStateFlow<ChatUiState>(ChatUiState.Loading)
     val chatState: StateFlow<ChatUiState> = _chatState.asStateFlow()
+
+    // Phase 5.2: Context-Aware Smart Replies
+    private val _smartReplies = MutableStateFlow<List<SmartReplyChip>>(emptyList())
+    val smartReplies: StateFlow<List<SmartReplyChip>> = _smartReplies.asStateFlow()
 
     private var financialContextPrompt: String = ""
     private var currentUserId: String = "local_user"
@@ -126,6 +137,19 @@ class ChatViewModel @Inject constructor(
                 }
 
                 val currentLanguage = settingsRepository.currentLanguage.value
+                val currencyCode = if (currentLanguage == "vi") "VND" else "USD"
+                val anomalies = detectTransactionAnomalyUseCase(
+                    allTransactions = allTransactions,
+                    dismissedIds = anomalyPreferences.dismissedIds.value,
+                    currencyCode = currencyCode
+                )
+                _smartReplies.value = generateSmartRepliesUseCase(
+                    allTransactions = allTransactions,
+                    activeBudgets = allBudgets,
+                    anomalies = anomalies,
+                    languageCode = currentLanguage
+                )
+
                 financialContextPrompt = PromptUtils.getFinancialAdvisorPrompt(
                     totalIncome, totalExpense, balance, expenseByCategory, budgetAnalysis,
                     languageCode = currentLanguage
@@ -138,6 +162,11 @@ class ChatViewModel @Inject constructor(
                 _chatState.value = ChatUiState.Success
             }
         }
+    }
+
+    fun sendSmartReply(chip: SmartReplyChip) {
+        _smartReplies.value = _smartReplies.value.filterNot { it.id == chip.id }
+        sendMessage(chip.promptText)
     }
 
     fun sendMessage(messageContent: String) {

@@ -313,4 +313,67 @@
     <string name="collapse_details">Collapse</string>
     <string name="time_elapsed_format">Time: %1$d%%</string>
     <string name="budget_spent_format">Spent: %1$d%%</string>
+
+    <!-- Phase 5.1: Financial DNA -->
+    <string name="financial_dna_title">Financial DNA</string>
+    <string name="financial_dna_short">DNA</string>
+    <string name="financial_dna_subtitle">Discover your unique money personality</string>
+    <string name="dna_passport_label">PERSONAL FINANCIAL IDENTITY</string>
+    <string name="dna_share_card">Share DNA</string>
+    <string name="dna_refresh">Refresh AI</string>
+    <string name="dna_ai_enhanced_badge">AI Personalized</string>
+    <string name="dna_local_analysis_badge">Smart Local Analysis</string>
+    <string name="dna_radar_title">4-Axis Behavioral Radar</string>
+    <string name="dna_radar_hint">Tap an axis below to inspect your exact score</string>
+    <string name="dna_axis_saver">Saver</string>
+    <string name="dna_axis_indulger">Indulger</string>
+    <string name="dna_axis_planner">Planner</string>
+    <string name="dna_axis_spontaneous">Spontaneous</string>
+    <string name="dna_axis_consistent">Consistent</string>
+    <string name="dna_axis_volatile">Volatile</string>
+    <string name="dna_axis_targeted">Targeted</string>
+    <string name="dna_axis_diverse">Diverse</string>
+    <string name="dna_metric_savings_rate">Savings Rate</string>
+    <string name="dna_metric_weekly_swing">Weekly Swing</string>
+    <string name="dna_metric_top_focus">Top-3 Share</string>
+    <string name="dna_story_title">Your Money Story</string>
+    <string name="dna_strengths_title">Superpowers</string>
+    <string name="dna_improvements_title">Growth Opportunities</string>
+    <string name="dna_top_categories_label">Dominant Categories</string>
+    <string name="dna_analyzed_footer">Analyzed %1$d transactions across %2$d days</string>
+    <string name="dna_insufficient_title">Unlock Your Financial DNA</string>
+    <string name="dna_insufficient_desc">Record at least %1$d transactions (including 3 expenses) so we can decode your 4-axis money personality.</string>
+    <string name="dna_insufficient_progress">%1$d / %2$d transactions recorded</string>
+    <string name="dna_add_transaction_cta">Add Transaction</string>
+    <string name="dna_loading_title">Decoding your Financial DNA…</string>
+    <string name="dna_loading_subtitle">Mapping spending rhythm, planning habits &amp; savings signature</string>
+    <string name="dna_share_template">🧬 My Financial DNA: %1$s (%2$s)\n\"%3$s\"\n\n• Savings Rate: %4$s\n• Weekly Swing: %5$s\n• Top Focus: %6$s\n\nDecoded by MoneyTracker AI</string>
+
+    <!-- Phase 5.2: Anomaly Detective & Smart Chat Replies -->
+    <string name="anomaly_banner_title">Anomaly Detective</string>
+    <string name="anomaly_banner_count">%1$d unusual transaction(s) spotted</string>
+    <string name="anomaly_banner_review">Review</string>
+    <string name="anomaly_dialog_title">Unusual Transaction Detected</string>
+    <string name="anomaly_action_legit">Looks Right</string>
+    <string name="anomaly_action_edit">Edit</string>
+    <string name="anomaly_action_delete">Delete</string>
+    <string name="anomaly_sheet_title">Flagged Transactions (%1$d)</string>
+    <string name="anomaly_sheet_subtitle">Tap any item to verify, edit, or delete accidental entries</string>
+    <string name="anomaly_marked_legit">Marked as legitimate</string>
+    <string name="smart_replies_header">Suggested for your wallet</string>
+
+    <!-- Phase 5.3: Proactive Coach & Weekly AI Digest -->
+    <string name="coach_badge_label">PROACTIVE AI COACH</string>
+    <string name="weekly_digest_title">Weekly AI Digest</string>
+    <string name="weekly_digest_subtitle">Your 7-day personal financial briefing</string>
+    <string name="weekly_digest_open">Open</string>
+    <string name="weekly_digest_total_spent">7-Day Spending</string>
+    <string name="weekly_digest_vs_last_week">vs last week</string>
+    <string name="weekly_digest_budgets_health">Budgets On Track</string>
+    <string name="weekly_digest_top_categories">Top Spending Categories</string>
+    <string name="weekly_digest_peak_day">Peak Spending Day</string>
+    <string name="weekly_digest_ai_commentary">Coach Commentary</string>
+    <string name="weekly_digest_tip_title">Tip for the Week Ahead</string>
+    <string name="weekly_digest_ask_coach">Ask AI Coach for Details</string>
+    <string name="weekly_digest_empty">Log transactions over the past 7 days to unlock your Weekly AI Digest.</string>
 </resources>

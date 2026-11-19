@@ -4,8 +4,11 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
 import com.example.moneymanager.domain.model.AiInsight
+import com.example.moneymanager.domain.model.FinancialDNA
+import com.example.moneymanager.domain.model.FinancialDnaAiNarrative
 import com.example.moneymanager.domain.model.PredictedBudget
 import com.example.moneymanager.domain.model.Transaction
+import com.example.moneymanager.domain.model.WeeklyDigest
 import com.example.moneymanager.domain.repository.AiServiceRepository
 import com.example.moneymanager.util.PromptUtils
 import com.example.moneymanager.util.toCurrencyString
@@ -51,6 +54,20 @@ class AiServiceRepositoryImpl @Inject constructor(
         private const val KEY_INSIGHT_TIP          = "insight_tip"
         private const val KEY_INSIGHT_LANG         = "insight_lang"
         private const val INSIGHT_TTL_MS           = 12 * 60 * 60 * 1000L
+
+        private const val KEY_DNA_GENERATED_AT     = "dna_generated_at"
+        private const val KEY_DNA_CODE             = "dna_code"
+        private const val KEY_DNA_LANG             = "dna_lang"
+        private const val KEY_DNA_NARRATIVE        = "dna_narrative"
+        private const val KEY_DNA_STRENGTHS        = "dna_strengths"
+        private const val KEY_DNA_IMPROVEMENTS     = "dna_improvements"
+        private const val DNA_TTL_MS               = 24 * 60 * 60 * 1000L
+
+        private const val KEY_DIGEST_GENERATED_AT  = "digest_generated_at"
+        private const val KEY_DIGEST_LANG          = "digest_lang"
+        private const val KEY_DIGEST_SUMMARY       = "digest_summary"
+        private const val KEY_DIGEST_TIP           = "digest_tip"
+        private const val DIGEST_TTL_MS            = 24 * 60 * 60 * 1000L
     }
 
     // ─── Provider Routing (Gemini → Ollama fallback) ──────────────────────────
@@ -282,6 +299,213 @@ class AiServiceRepositoryImpl @Inject constructor(
             basedOnMonths = 3,
             averageMonthlySpend = avg
         )
+    }
+
+    // ─── Financial DNA Narrative ──────────────────────────────────────────────
+
+    override suspend fun getFinancialDnaNarrative(
+        dna: FinancialDNA,
+        languageCode: String
+    ): FinancialDnaAiNarrative? {
+        val cached = loadCachedDnaNarrative()
+        if (cached != null &&
+            cached.dnaCode == dna.code &&
+            cached.languageCode == languageCode &&
+            (System.currentTimeMillis() - cached.generatedAt) < DNA_TTL_MS
+        ) {
+            return cached
+        }
+
+        val prompt = PromptUtils.getFinancialDnaPrompt(
+            dnaCode = dna.code,
+            archetypeTitle = dna.archetype.title(languageCode),
+            savingsScore = dna.savingsScore,
+            plannerScore = dna.plannerScore,
+            stabilityScore = dna.stabilityScore,
+            focusScore = dna.focusScore,
+            savingsRatePercent = dna.savingsRatePercent,
+            weeklyVariancePercent = dna.weeklyVariancePercent,
+            topCategoriesSharePercent = dna.topCategoriesSharePercent,
+            topCategories = dna.topCategories.joinToString(", ") { sanitizeInput(it) }.ifBlank { "General" },
+            languageCode = languageCode
+        )
+
+        return try {
+            val result = queryAi(prompt, jsonMode = true)
+            result.fold(
+                onSuccess = { json ->
+                    val parsed = parseFinancialDnaNarrative(json, dna.code, languageCode)
+                    if (parsed != null) saveDnaNarrativeToCache(parsed)
+                    parsed
+                },
+                onFailure = { null }
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "[AI] Financial DNA narrative parse/query error", e)
+            null
+        }
+    }
+
+    private fun parseFinancialDnaNarrative(
+        rawResponse: String,
+        dnaCode: String,
+        languageCode: String
+    ): FinancialDnaAiNarrative? {
+        return try {
+            val cleaned = rawResponse.trim()
+                .removePrefix("```json")
+                .removePrefix("```")
+                .removeSuffix("```")
+                .trim()
+            val obj = JsonParser.parseString(cleaned).asJsonObject
+            val narrative = obj.get("narrative")?.asString?.trim()?.takeIf { it.isNotBlank() }
+                ?: return null
+            val strengths = obj.getAsJsonArray("strengths")
+                ?.mapNotNull { it.asString?.trim()?.takeIf { s -> s.isNotBlank() } }
+                ?.take(3)
+                ?: emptyList()
+            val improvements = obj.getAsJsonArray("improvements")
+                ?.mapNotNull { it.asString?.trim()?.takeIf { s -> s.isNotBlank() } }
+                ?.take(3)
+                ?: emptyList()
+
+            FinancialDnaAiNarrative(
+                narrative = narrative,
+                strengths = strengths,
+                improvements = improvements,
+                dnaCode = dnaCode,
+                languageCode = languageCode,
+                generatedAt = System.currentTimeMillis()
+            )
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun loadCachedDnaNarrative(): FinancialDnaAiNarrative? {
+        val generatedAt = prefs.getLong(KEY_DNA_GENERATED_AT, 0L)
+        if (generatedAt == 0L) return null
+        val narrative = prefs.getString(KEY_DNA_NARRATIVE, null)?.takeIf { it.isNotBlank() } ?: return null
+        val code = prefs.getString(KEY_DNA_CODE, null) ?: return null
+        val lang = prefs.getString(KEY_DNA_LANG, "vi") ?: "vi"
+        val strengths = prefs.getString(KEY_DNA_STRENGTHS, "")
+            ?.split("||")
+            ?.filter { it.isNotBlank() }
+            ?: emptyList()
+        val improvements = prefs.getString(KEY_DNA_IMPROVEMENTS, "")
+            ?.split("||")
+            ?.filter { it.isNotBlank() }
+            ?: emptyList()
+        return FinancialDnaAiNarrative(
+            narrative = narrative,
+            strengths = strengths,
+            improvements = improvements,
+            dnaCode = code,
+            languageCode = lang,
+            generatedAt = generatedAt
+        )
+    }
+
+    private fun saveDnaNarrativeToCache(narrative: FinancialDnaAiNarrative) {
+        prefs.edit()
+            .putLong(KEY_DNA_GENERATED_AT, narrative.generatedAt)
+            .putString(KEY_DNA_CODE, narrative.dnaCode)
+            .putString(KEY_DNA_LANG, narrative.languageCode)
+            .putString(KEY_DNA_NARRATIVE, narrative.narrative)
+            .putString(KEY_DNA_STRENGTHS, narrative.strengths.joinToString("||"))
+            .putString(KEY_DNA_IMPROVEMENTS, narrative.improvements.joinToString("||"))
+            .apply()
+    }
+
+    override fun clearDnaCache() {
+        prefs.edit()
+            .remove(KEY_DNA_GENERATED_AT)
+            .remove(KEY_DNA_CODE)
+            .remove(KEY_DNA_LANG)
+            .remove(KEY_DNA_NARRATIVE)
+            .remove(KEY_DNA_STRENGTHS)
+            .remove(KEY_DNA_IMPROVEMENTS)
+            .apply()
+    }
+
+    // ─── Weekly AI Digest Commentary ──────────────────────────────────────────
+
+    override suspend fun getWeeklyDigestCommentary(
+        digest: WeeklyDigest,
+        languageCode: String
+    ): Pair<String, String>? {
+        val cachedAt = prefs.getLong(KEY_DIGEST_GENERATED_AT, 0L)
+        val cachedLang = prefs.getString(KEY_DIGEST_LANG, null)
+        if (cachedAt > 0L && cachedLang == languageCode &&
+            (System.currentTimeMillis() - cachedAt) < DIGEST_TTL_MS
+        ) {
+            val summary = prefs.getString(KEY_DIGEST_SUMMARY, null)?.takeIf { it.isNotBlank() }
+            val tip = prefs.getString(KEY_DIGEST_TIP, null)?.takeIf { it.isNotBlank() }
+            if (summary != null && tip != null) return summary to tip
+        }
+
+        val currencyCode = if (languageCode == "vi") "VND" else "USD"
+        val topSummary = digest.topCategories.joinToString(", ") {
+            "${sanitizeInput(it.category)}: ${it.amount.toCurrencyString(currencyCode)}"
+        }.ifBlank { "General" }
+        val budgetText = if (digest.budgetsTotalCount > 0) {
+            "${digest.budgetsOnTrackCount}/${digest.budgetsTotalCount}"
+        } else {
+            if (languageCode == "vi") "Chưa đặt ngân sách" else "No active budgets"
+        }
+        val highestDayText = if (digest.highestSpendDayAmount > 0.0) {
+            "${digest.highestSpendDayLabel} (${digest.highestSpendDayAmount.toCurrencyString(currencyCode)})"
+        } else {
+            "N/A"
+        }
+
+        val prompt = PromptUtils.getWeeklyDigestPrompt(
+            totalSpentFormatted = digest.totalSpent.toCurrencyString(currencyCode),
+            previousWeekSpentFormatted = digest.previousWeekSpent.toCurrencyString(currencyCode),
+            deltaPercent = digest.deltaPercent,
+            topCategoriesSummary = topSummary,
+            budgetsOnTrackText = budgetText,
+            highestDayText = highestDayText,
+            languageCode = languageCode
+        )
+
+        return try {
+            val result = queryAi(prompt, jsonMode = true)
+            result.fold(
+                onSuccess = { raw ->
+                    val cleaned = raw.trim()
+                        .removePrefix("```json")
+                        .removePrefix("```")
+                        .removeSuffix("```")
+                        .trim()
+                    val obj = JsonParser.parseString(cleaned).asJsonObject
+                    val summary = obj.get("summary")?.asString?.trim()?.takeIf { it.isNotBlank() }
+                        ?: return null
+                    val tip = obj.get("tip")?.asString?.trim()?.takeIf { it.isNotBlank() }
+                        ?: return null
+                    prefs.edit()
+                        .putLong(KEY_DIGEST_GENERATED_AT, System.currentTimeMillis())
+                        .putString(KEY_DIGEST_LANG, languageCode)
+                        .putString(KEY_DIGEST_SUMMARY, summary)
+                        .putString(KEY_DIGEST_TIP, tip)
+                        .apply()
+                    summary to tip
+                },
+                onFailure = { null }
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "[AI] Weekly digest parse/query error", e)
+            null
+        }
+    }
+
+    override fun clearWeeklyDigestCache() {
+        prefs.edit()
+            .remove(KEY_DIGEST_GENERATED_AT)
+            .remove(KEY_DIGEST_LANG)
+            .remove(KEY_DIGEST_SUMMARY)
+            .remove(KEY_DIGEST_TIP)
+            .apply()
     }
 
     // ─── Security Utilities ───────────────────────────────────────────────────

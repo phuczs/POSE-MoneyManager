@@ -313,4 +313,67 @@
     <string name="collapse_details">Thu gọn</string>
     <string name="time_elapsed_format">Thời gian: %1$d%%</string>
     <string name="budget_spent_format">Đã tiêu: %1$d%%</string>
+
+    <!-- Phase 5.1: Financial DNA -->
+    <string name="financial_dna_title">Financial DNA</string>
+    <string name="financial_dna_short">DNA</string>
+    <string name="financial_dna_subtitle">Khám phá chân dung tính cách tài chính của riêng bạn</string>
+    <string name="dna_passport_label">CHÂN DUNG TÀI CHÍNH CÁ NHÂN</string>
+    <string name="dna_share_card">Chia sẻ DNA</string>
+    <string name="dna_refresh">Phân tích lại</string>
+    <string name="dna_ai_enhanced_badge">AI Cá nhân hóa</string>
+    <string name="dna_local_analysis_badge">Phân tích Thông minh</string>
+    <string name="dna_radar_title">Biểu đồ Hành vi 4 Trục</string>
+    <string name="dna_radar_hint">Chạm vào từng trục để xem chỉ số chi tiết</string>
+    <string name="dna_axis_saver">Tiết kiệm</string>
+    <string name="dna_axis_indulger">Hưởng thụ</string>
+    <string name="dna_axis_planner">Kế hoạch</string>
+    <string name="dna_axis_spontaneous">Ngẫu hứng</string>
+    <string name="dna_axis_consistent">Ổn định</string>
+    <string name="dna_axis_volatile">Biến động</string>
+    <string name="dna_axis_targeted">Tập trung</string>
+    <string name="dna_axis_diverse">Phân tán</string>
+    <string name="dna_metric_savings_rate">Tỷ lệ tiết kiệm</string>
+    <string name="dna_metric_weekly_swing">Dao động tuần</string>
+    <string name="dna_metric_top_focus">Tập trung Top 3</string>
+    <string name="dna_story_title">Câu chuyện Tài chính của bạn</string>
+    <string name="dna_strengths_title">Điểm mạnh nổi bật</string>
+    <string name="dna_improvements_title">Cơ hội nâng cấp</string>
+    <string name="dna_top_categories_label">Danh mục chi tiêu chính</string>
+    <string name="dna_analyzed_footer">Phân tích từ %1$d giao dịch trong %2$d ngày</string>
+    <string name="dna_insufficient_title">Mở khóa Financial DNA của bạn</string>
+    <string name="dna_insufficient_desc">Ghi chép ít nhất %1$d giao dịch (gồm tối thiểu 3 khoản chi) để AI giải mã chân dung tài chính 4 trục độc quyền.</string>
+    <string name="dna_insufficient_progress">Đã ghi %1$d / %2$d giao dịch</string>
+    <string name="dna_add_transaction_cta">Thêm giao dịch ngay</string>
+    <string name="dna_loading_title">Đang giải mã Financial DNA…</string>
+    <string name="dna_loading_subtitle">Đang phân tích nhịp chi tiêu, thói quen kế hoạch &amp; dấu ấn tiết kiệm</string>
+    <string name="dna_share_template">🧬 Financial DNA của tôi: %1$s (%2$s)\n\"%3$s\"\n\n• Tỷ lệ tiết kiệm: %4$s\n• Dao động tuần: %5$s\n• Tập trung Top 3: %6$s\n\nGiải mã bởi MoneyTracker AI</string>
+
+    <!-- Phase 5.2: Anomaly Detective & Smart Chat Replies -->
+    <string name="anomaly_banner_title">Phát hiện Bất thường</string>
+    <string name="anomaly_banner_count">Phát hiện %1$d giao dịch có dấu hiệu lạ</string>
+    <string name="anomaly_banner_review">Rà soát</string>
+    <string name="anomaly_dialog_title">Cảnh báo Giao dịch Bất thường</string>
+    <string name="anomaly_action_legit">Đúng rồi</string>
+    <string name="anomaly_action_edit">Sửa</string>
+    <string name="anomaly_action_delete">Xóa</string>
+    <string name="anomaly_sheet_title">Giao dịch cần rà soát (%1$d)</string>
+    <string name="anomaly_sheet_subtitle">Kiểm tra lại để xác nhận hoặc xóa các khoản ghi nhầm</string>
+    <string name="anomaly_marked_legit">Đã xác nhận giao dịch hợp lệ</string>
+    <string name="smart_replies_header">Gợi ý theo tình trạng ví của bạn</string>
+
+    <!-- Phase 5.3: Proactive Coach & Weekly AI Digest -->
+    <string name="coach_badge_label">HUẤN LUYỆN VIÊN AI</string>
+    <string name="weekly_digest_title">Bản tin Tài chính Tuần</string>
+    <string name="weekly_digest_subtitle">Tổng kết thông minh 7 ngày qua dành riêng cho bạn</string>
+    <string name="weekly_digest_open">Xem ngay</string>
+    <string name="weekly_digest_total_spent">Tổng chi 7 ngày</string>
+    <string name="weekly_digest_vs_last_week">so với tuần trước</string>
+    <string name="weekly_digest_budgets_health">Ngân sách ổn định</string>
+    <string name="weekly_digest_top_categories">Top Danh mục Chi tiêu</string>
+    <string name="weekly_digest_peak_day">Ngày chi cao nhất</string>
+    <string name="weekly_digest_ai_commentary">Nhận xét từ AI Coach</string>
+    <string name="weekly_digest_tip_title">Mẹo hành động tuần tới</string>
+    <string name="weekly_digest_ask_coach">Hỏi AI Coach chi tiết hơn</string>
+    <string name="weekly_digest_empty">Hãy ghi chép giao dịch trong 7 ngày qua để mở khóa Bản tin Tài chính Tuần.</string>
 </resources>

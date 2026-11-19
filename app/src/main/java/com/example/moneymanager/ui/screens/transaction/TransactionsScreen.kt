@@ -41,9 +41,15 @@ import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.example.moneymanager.data.model.Transaction
+import com.example.moneymanager.domain.model.AnomalySeverity
 import com.example.moneymanager.domain.model.Category
 import com.example.moneymanager.domain.model.RecurringFrequency
 import com.example.moneymanager.domain.model.RecurringTransaction
+import com.example.moneymanager.domain.model.TransactionAnomaly
+import com.example.moneymanager.ui.screens.transaction.components.AnomalyAlertBanner
+import com.example.moneymanager.ui.screens.transaction.components.AnomalyBadgePill
+import com.example.moneymanager.ui.screens.transaction.components.AnomalyReviewBottomSheet
+import com.example.moneymanager.ui.screens.transaction.components.AnomalyReviewDialog
 import com.example.moneymanager.ui.theme.MediumGreen
 import com.example.moneymanager.ui.theme.TextGray
 import com.example.moneymanager.ui.theme.TextPrimary
@@ -82,7 +88,12 @@ fun TransactionsScreen(
     val selectedTransactionIds by transactionViewModel.selectedTransactionIds.collectAsState()
     val searchQuery by transactionViewModel.searchQuery.collectAsState()
     val searchFilterState by transactionViewModel.searchFilterState.collectAsState()
+    val anomalies by transactionViewModel.anomalies.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // Anomaly Detective UI state
+    var selectedAnomalyTx by remember { mutableStateOf<Pair<Transaction, TransactionAnomaly>?>(null) }
+    var showAnomalySheet by remember { mutableStateOf(false) }
 
     // Recurring state
     val recurringUiState by recurringViewModel.uiState.collectAsStateWithLifecycle()
@@ -340,6 +351,18 @@ fun TransactionsScreen(
                     }
                 }
 
+                // Phase 5.2: Anomaly Detective protective banner
+                if (anomalies.isNotEmpty() && !isSelectionMode && !isSearchActive) {
+                    val highestSeverity = anomalies.values.maxByOrNull { it.severity.rank }?.severity
+                        ?: AnomalySeverity.MEDIUM
+                    AnomalyAlertBanner(
+                        anomaliesCount = anomalies.size,
+                        highestSeverity = highestSeverity,
+                        onReviewClick = { showAnomalySheet = true },
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                }
+
                 // Paged transactions list — Room-backed, offline-first
                 when {
                     isSearchActive || searchFilterState.isActive -> {
@@ -367,10 +390,13 @@ fun TransactionsScreen(
                                     PagedTransactionList(
                                         transactions = transactions,
                                         allCategories = allCategories,
+                                        anomalies = anomalies,
+                                        languageCode = currentLanguage,
                                         isSelectionMode = isSelectionMode,
                                         selectedTransactionIds = selectedTransactionIds,
                                         currencyCode = currencyCode,
                                         onTransactionClick = onTransactionClick,
+                                        onAnomalyClick = { tx, anomaly -> selectedAnomalyTx = tx to anomaly },
                                         transactionViewModel = transactionViewModel
                                     )
                                 }
@@ -381,10 +407,13 @@ fun TransactionsScreen(
                         PagedTransactionListWithPaging(
                             pagedTransactions = pagedTransactions,
                             allCategories = allCategories,
+                            anomalies = anomalies,
+                            languageCode = currentLanguage,
                             isSelectionMode = isSelectionMode,
                             selectedTransactionIds = selectedTransactionIds,
                             currencyCode = currencyCode,
                             onTransactionClick = onTransactionClick,
+                            onAnomalyClick = { tx, anomaly -> selectedAnomalyTx = tx to anomaly },
                             transactionViewModel = transactionViewModel
                         )
                     }
@@ -478,6 +507,69 @@ fun TransactionsScreen(
                 }
             }
         )
+    }
+
+    val markedLegitMsg = stringResource(R.string.anomaly_marked_legit)
+    selectedAnomalyTx?.let { (tx, anomaly) ->
+        AnomalyReviewDialog(
+            transaction = tx,
+            anomaly = anomaly,
+            languageCode = currentLanguage,
+            currencyCode = currencyCode,
+            onDismiss = { selectedAnomalyTx = null },
+            onMarkLegit = {
+                transactionViewModel.dismissAnomaly(tx.id)
+                selectedAnomalyTx = null
+                scope.launch { snackbarHostState.showSnackbar(markedLegitMsg) }
+            },
+            onEdit = {
+                selectedAnomalyTx = null
+                onTransactionClick(tx.id)
+            },
+            onDelete = {
+                transactionViewModel.deleteTransaction(tx.id)
+                selectedAnomalyTx = null
+            }
+        )
+    }
+
+    if (showAnomalySheet) {
+        val allLoadedTxs = (transactionsState as? TransactionViewModel.TransactionsState.Success)?.transactions
+            ?: emptyList()
+        val txLookup = remember(allLoadedTxs, pagedTransactions.itemCount) {
+            val map = HashMap<String, Transaction>()
+            allLoadedTxs.forEach { map[it.id] = it }
+            for (i in 0 until pagedTransactions.itemCount) {
+                pagedTransactions.peek(i)?.let { map[it.id] = it }
+            }
+            map
+        }
+        val flaggedItems = remember(anomalies, txLookup) {
+            anomalies.values
+                .sortedByDescending { it.severity.rank }
+                .mapNotNull { anomaly -> txLookup[anomaly.transactionId]?.let { it to anomaly } }
+        }
+        if (flaggedItems.isEmpty()) {
+            showAnomalySheet = false
+        } else {
+            AnomalyReviewBottomSheet(
+                flaggedItems = flaggedItems,
+                languageCode = currentLanguage,
+                currencyCode = currencyCode,
+                onDismiss = { showAnomalySheet = false },
+                onMarkLegit = { id ->
+                    transactionViewModel.dismissAnomaly(id)
+                    scope.launch { snackbarHostState.showSnackbar(markedLegitMsg) }
+                },
+                onEdit = { id ->
+                    showAnomalySheet = false
+                    onTransactionClick(id)
+                },
+                onDelete = { id ->
+                    transactionViewModel.deleteTransaction(id)
+                }
+            )
+        }
     }
 
     if (recurringToDelete != null) {
@@ -576,10 +668,13 @@ private fun EmptyTransactionsPlaceholder(isSearchActive: Boolean) {
 private fun PagedTransactionList(
     transactions: List<Transaction>,
     allCategories: List<com.example.moneymanager.data.model.Category>,
+    anomalies: Map<String, TransactionAnomaly> = emptyMap(),
+    languageCode: String = "vi",
     isSelectionMode: Boolean,
     selectedTransactionIds: Set<String>,
     currencyCode: String,
     onTransactionClick: (String) -> Unit,
+    onAnomalyClick: (Transaction, TransactionAnomaly) -> Unit = { _, _ -> },
     transactionViewModel: TransactionViewModel
 ) {
     val grouped = remember(transactions) {
@@ -602,9 +697,13 @@ private fun PagedTransactionList(
                 )
             }
             itemsIndexed(txList, key = { _, tx -> tx.id }) { index, transaction ->
+                val txAnomaly = anomalies[transaction.id]
                 TransactionListItem(
                     transaction = transaction,
                     categoryInfo = allCategories.find { it.name.equals(transaction.category, ignoreCase = true) },
+                    anomaly = txAnomaly,
+                    languageCode = languageCode,
+                    onAnomalyClick = txAnomaly?.let { a -> { onAnomalyClick(transaction, a) } },
                     isSelectionMode = isSelectionMode,
                     isSelected = selectedTransactionIds.contains(transaction.id),
                     onTransactionClick = {
@@ -636,10 +735,13 @@ private fun PagedTransactionList(
 private fun PagedTransactionListWithPaging(
     pagedTransactions: LazyPagingItems<Transaction>,
     allCategories: List<com.example.moneymanager.data.model.Category>,
+    anomalies: Map<String, TransactionAnomaly> = emptyMap(),
+    languageCode: String = "vi",
     isSelectionMode: Boolean,
     selectedTransactionIds: Set<String>,
     currencyCode: String,
     onTransactionClick: (String) -> Unit,
+    onAnomalyClick: (Transaction, TransactionAnomaly) -> Unit = { _, _ -> },
     transactionViewModel: TransactionViewModel
 ) {
     when (pagedTransactions.loadState.refresh) {
@@ -708,9 +810,13 @@ private fun PagedTransactionListWithPaging(
                         )
                     }
 
+                    val txAnomaly = anomalies[transaction.id]
                     TransactionListItem(
                         transaction = transaction,
                         categoryInfo = allCategories.find { it.name.equals(transaction.category, ignoreCase = true) },
+                        anomaly = txAnomaly,
+                        languageCode = languageCode,
+                        onAnomalyClick = txAnomaly?.let { a -> { onAnomalyClick(transaction, a) } },
                         isSelectionMode = isSelectionMode,
                         isSelected = selectedTransactionIds.contains(transaction.id),
                         onTransactionClick = {
@@ -915,7 +1021,10 @@ fun TransactionListItem(
     isSelectionMode: Boolean,
     isSelected: Boolean,
     onTransactionLongClick: () -> Unit,
-    currencyCode: String
+    currencyCode: String,
+    anomaly: TransactionAnomaly? = null,
+    languageCode: String = "vi",
+    onAnomalyClick: (() -> Unit)? = null
 ) {
     val customColorHex = categoryInfo?.colorHex ?: ""
     val customColor = if (customColorHex.isNotBlank()) {
@@ -981,6 +1090,15 @@ fun TransactionListItem(
                     color = Color.Gray,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            if (anomaly != null && onAnomalyClick != null) {
+                Spacer(modifier = Modifier.height(4.dp))
+                AnomalyBadgePill(
+                    anomaly = anomaly,
+                    languageCode = languageCode,
+                    onClick = onAnomalyClick
                 )
             }
         }

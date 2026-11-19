@@ -1,9 +1,16 @@
 package com.example.moneymanager.ui.screens.chat
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.*
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -13,6 +20,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material3.*
@@ -28,6 +36,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.moneymanager.data.model.ChatMessage
+import com.example.moneymanager.domain.model.SmartReplyCategory
+import com.example.moneymanager.domain.model.SmartReplyChip
+import com.example.moneymanager.ui.theme.DarkGreen
 import com.example.moneymanager.ui.theme.MediumGreen
 import com.example.moneymanager.ui.theme.TextGray
 import com.example.moneymanager.ui.viewmodel.ChatUiState
@@ -47,6 +58,8 @@ fun ChatScreen(
     // Sử dụng collectAsStateWithLifecycle để fix lỗi "Cannot infer type"
     val chatState by viewModel.chatState.collectAsStateWithLifecycle()
     val messages by viewModel.messages.collectAsStateWithLifecycle()
+    val smartReplies by viewModel.smartReplies.collectAsStateWithLifecycle()
+    val isAiTyping = remember(messages) { messages.any { it.isLoading } }
 
     val listState = rememberLazyListState()
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -138,6 +151,21 @@ fun ChatScreen(
                     items(messages, key = { it.id }) { message ->
                         ChatBubble(message = message)
                     }
+                }
+
+                // Phase 5.2: Context-Aware Smart Reply Chips
+                AnimatedVisibility(
+                    visible = smartReplies.isNotEmpty() && chatState is ChatUiState.Success && !isAiTyping,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    SmartReplyChipsRow(
+                        chips = smartReplies,
+                        onChipClick = { chip ->
+                            keyboardController?.hide()
+                            viewModel.sendSmartReply(chip)
+                        }
+                    )
                 }
 
                 MessageInput(
@@ -307,6 +335,76 @@ fun MessageInput(
                 contentDescription = stringResource(R.string.send),
                 tint = Color.White
             )
+        }
+    }
+}
+
+@Composable
+private fun SmartReplyChipsRow(
+    chips: List<SmartReplyChip>,
+    onChipClick: (SmartReplyChip) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(top = 6.dp, bottom = 2.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.AutoAwesome,
+                contentDescription = null,
+                tint = MediumGreen,
+                modifier = Modifier.size(13.dp)
+            )
+            Spacer(modifier = Modifier.width(5.dp))
+            Text(
+                text = stringResource(R.string.smart_replies_header),
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                color = TextGray
+            )
+        }
+
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(chips, key = { it.id }) { chip ->
+                val (bgColor, borderColor, textColor) = when (chip.category) {
+                    SmartReplyCategory.ALERT, SmartReplyCategory.ANOMALY -> Triple(
+                        Color(0xFFFFF4E5),
+                        Color(0xFFF6C67D),
+                        Color(0xFF9A3412)
+                    )
+                    SmartReplyCategory.BUDGET -> Triple(
+                        Color(0xFFEDF8F4),
+                        Color(0xFFB5E2D4),
+                        DarkGreen
+                    )
+                    SmartReplyCategory.INSIGHT -> Triple(
+                        Color.White,
+                        Color(0xFFD5DFDC),
+                        Color(0xFF1F2937)
+                    )
+                }
+
+                Surface(
+                    onClick = { onChipClick(chip) },
+                    shape = RoundedCornerShape(14.dp),
+                    color = bgColor,
+                    border = BorderStroke(1.dp, borderColor)
+                ) {
+                    Text(
+                        text = chip.label,
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = textColor,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp)
+                    )
+                }
+            }
         }
     }
 }

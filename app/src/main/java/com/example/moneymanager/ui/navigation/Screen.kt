@@ -24,4 +24,5 @@ sealed class Screen(val route: String) {
     object Budgets : Screen("budgets_screen")
     object Chat : Screen("chat_screen")
     object RecurringTransactions : Screen("recurring_transactions_screen")
+    object FinancialDna : Screen("financial_dna_screen")
 }

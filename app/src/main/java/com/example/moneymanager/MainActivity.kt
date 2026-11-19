@@ -15,7 +15,9 @@ import dagger.hilt.android.AndroidEntryPoint
 import android.content.Context
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.moneymanager.ui.viewmodel.AuthViewModel
@@ -114,7 +116,8 @@ class MainActivity : FragmentActivity() {
                             AppLockScreen(onUnlock = { securityViewModel.unlock() })
                         } else {
                             val navController = rememberNavController()
-                            
+                            var openWeeklyDigest by remember { mutableStateOf(false) }
+
                             LaunchedEffect(intent) {
                                 val target = intent.getStringExtra(com.example.moneymanager.widget.MoneyManagerWidgetProvider.EXTRA_NAVIGATE_TO)
                                 if (target != null) {
@@ -126,11 +129,21 @@ class MainActivity : FragmentActivity() {
                                         com.example.moneymanager.widget.MoneyManagerWidgetProvider.NAV_CHAT -> {
                                             navController.navigate(com.example.moneymanager.ui.navigation.Screen.Chat.route)
                                         }
+                                        com.example.moneymanager.util.NotificationHelper.NAV_BUDGETS -> {
+                                            navController.navigate(com.example.moneymanager.ui.navigation.Screen.Budgets.route)
+                                        }
+                                        com.example.moneymanager.util.NotificationHelper.NAV_WEEKLY_DIGEST -> {
+                                            openWeeklyDigest = true
+                                        }
                                     }
                                 }
                             }
 
-                            MainContainer(navController = navController)
+                            MainContainer(
+                                navController = navController,
+                                openWeeklyDigestOnStart = openWeeklyDigest,
+                                onConsumeWeeklyDigestFlag = { openWeeklyDigest = false }
+                            )
                         }
                     }
                 }

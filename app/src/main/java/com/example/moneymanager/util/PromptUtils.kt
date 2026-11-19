@@ -225,4 +225,118 @@ object PromptUtils {
             """.trimIndent()
         }
     }
+
+    /**
+     * Prompt for Financial DNA personalized storytelling & coaching.
+     * Security: Only receives aggregated scores and top category names — zero raw PII.
+     */
+    fun getFinancialDnaPrompt(
+        dnaCode: String,
+        archetypeTitle: String,
+        savingsScore: Int,
+        plannerScore: Int,
+        stabilityScore: Int,
+        focusScore: Int,
+        savingsRatePercent: Double,
+        weeklyVariancePercent: Double,
+        topCategoriesSharePercent: Double,
+        topCategories: String,
+        languageCode: String = "vi"
+    ): String {
+        val sr = String.format(java.util.Locale.US, "%.1f", savingsRatePercent)
+        val wv = String.format(java.util.Locale.US, "%.0f", weeklyVariancePercent)
+        val tc = String.format(java.util.Locale.US, "%.0f", topCategoriesSharePercent)
+
+        return if (languageCode == "vi") {
+            """
+            Bạn là chuyên gia tâm lý học tài chính cá nhân. Dựa trên hồ sơ Financial DNA dưới đây, hãy viết phân tích cá nhân hóa thật sâu sắc, ấm áp và gần gũi như MBTI tài chính.
+
+            HỒ SƠ FINANCIAL DNA:
+            - Mã DNA: $dnaCode ($archetypeTitle)
+            - Trục Tiết kiệm vs Hưởng thụ: $savingsScore/100 (Tỷ lệ tiết kiệm: $sr%)
+            - Trục Kế hoạch vs Ngẫu hứng: $plannerScore/100
+            - Trục Ổn định vs Biến động: $stabilityScore/100 (Dao động tuần: ±$wv%)
+            - Trục Tập trung vs Phân tán: $focusScore/100 (Top danh mục chiếm $tc%: $topCategories)
+
+            Trả về JSON hợp lệ với đúng 3 trường sau (không thêm markdown hay văn bản thừa):
+            {
+              "narrative": "2-3 câu kể câu chuyện cá tính tài chính của người dùng một cách tự nhiên, sắc sảo dựa vào số liệu thật",
+              "strengths": ["Điểm mạnh cụ thể 1", "Điểm mạnh cụ thể 2"],
+              "improvements": ["Gợi ý cải thiện thiết thực 1", "Gợi ý cải thiện thiết thực 2"]
+            }
+            CHỈ TRẢ VỀ JSON:
+            """.trimIndent()
+        } else {
+            """
+            You are a personal finance behavioral psychologist. Based on the Financial DNA profile below, write an insightful, warm, MBTI-style personalized portrait.
+
+            FINANCIAL DNA PROFILE:
+            - DNA Code: $dnaCode ($archetypeTitle)
+            - Saver vs Indulger: $savingsScore/100 (Savings rate: $sr%)
+            - Planner vs Spontaneous: $plannerScore/100
+            - Consistent vs Volatile: $stabilityScore/100 (Weekly swing: ±$wv%)
+            - Targeted vs Diverse: $focusScore/100 (Top categories share $tc%: $topCategories)
+
+            Return valid JSON with exactly these 3 fields (no markdown or extra text):
+            {
+              "narrative": "2-3 crisp, engaging sentences portraying their financial personality grounded in their real numbers",
+              "strengths": ["Concrete strength 1", "Concrete strength 2"],
+              "improvements": ["Practical growth tip 1", "Practical growth tip 2"]
+            }
+            ONLY RETURN JSON:
+            """.trimIndent()
+        }
+    }
+
+    /**
+     * Prompt for Weekly AI Digest commentary & actionable tip.
+     * Security: Only aggregated 7-day totals and top category names are transmitted.
+     */
+    fun getWeeklyDigestPrompt(
+        totalSpentFormatted: String,
+        previousWeekSpentFormatted: String,
+        deltaPercent: Double,
+        topCategoriesSummary: String,
+        budgetsOnTrackText: String,
+        highestDayText: String,
+        languageCode: String = "vi"
+    ): String {
+        val deltaSign = if (deltaPercent >= 0) "+" else ""
+        val deltaFormatted = "$deltaSign${String.format(java.util.Locale.US, "%.0f", deltaPercent)}%"
+        return if (languageCode == "vi") {
+            """
+            Bạn là huấn luyện viên tài chính cá nhân (Proactive Financial Coach). Hãy viết bản tin tổng kết 7 ngày qua ngắn gọn, sắc bén và khích lệ.
+
+            DỮ LIỆU TUẦN QUA:
+            - Tổng chi tuần này: $totalSpentFormatted (so với tuần trước $previousWeekSpentFormatted: $deltaFormatted)
+            - Top danh mục: $topCategoriesSummary
+            - Ngày chi cao nhất: $highestDayText
+            - Trạng thái ngân sách: $budgetsOnTrackText
+
+            Trả về JSON hợp lệ gồm đúng 2 trường (không markdown, không văn bản thừa):
+            {
+              "summary": "2 câu nhận xét sát thực tế về xu hướng chi tiêu 7 ngày qua, giọng gần gũi, khích lệ",
+              "tip": "1 mẹo hành động cụ thể, dễ làm ngay trong tuần tới"
+            }
+            CHỈ TRẢ VỀ JSON:
+            """.trimIndent()
+        } else {
+            """
+            You are a Proactive Financial Coach. Write a crisp, warm 7-day personal finance digest commentary.
+
+            PAST 7 DAYS SUMMARY:
+            - Total spent: $totalSpentFormatted (vs prior week $previousWeekSpentFormatted: $deltaFormatted)
+            - Top categories: $topCategoriesSummary
+            - Peak spending day: $highestDayText
+            - Budgets status: $budgetsOnTrackText
+
+            Return valid JSON with exactly 2 fields (no markdown or extra text):
+            {
+              "summary": "2 warm, data-grounded sentences analyzing the past 7 days' spending trend",
+              "tip": "1 concrete, easy-to-apply tip for the week ahead"
+            }
+            ONLY RETURN JSON:
+            """.trimIndent()
+        }
+    }
 }

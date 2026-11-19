@@ -39,7 +39,12 @@ import com.example.moneymanager.R // [QUAN TRỌNG]
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.moneymanager.domain.model.NudgeActionTarget
 import com.example.moneymanager.domain.model.Transaction
+import com.example.moneymanager.ui.screens.dashboard.components.ProactiveCoachBanner
+import com.example.moneymanager.ui.screens.dashboard.components.WeeklyDigestBottomSheet
+import com.example.moneymanager.ui.screens.dashboard.components.WeeklyDigestEntryCard
 import com.example.moneymanager.ui.theme.BackgroundGray
 import com.example.moneymanager.ui.theme.MediumGreen
 import com.example.moneymanager.ui.theme.TextGray
@@ -48,6 +53,7 @@ import com.example.moneymanager.ui.viewmodel.TransactionViewModel
 import com.example.moneymanager.ui.viewmodel.BudgetViewModel
 import com.example.moneymanager.ui.viewmodel.AiInsightViewModel
 import com.example.moneymanager.ui.viewmodel.InsightUiState
+import com.example.moneymanager.ui.viewmodel.ProactiveCoachViewModel
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.AutoAwesome
 import com.example.moneymanager.ui.viewmodel.AuthViewModel
@@ -67,17 +73,33 @@ fun DashboardScreen(
     onNavigateToProfile: () -> Unit,
     onNavigateToBudgets: () -> Unit,
     onNavigateToChat: () -> Unit,
+    onNavigateToFinancialDna: () -> Unit = {},
     onTransactionClick: (String) -> Unit,
+    openWeeklyDigestOnStart: Boolean = false,
+    onConsumeWeeklyDigestFlag: () -> Unit = {},
     authViewModel: AuthViewModel = hiltViewModel(),
     transactionViewModel: TransactionViewModel = hiltViewModel(),
     budgetViewModel: BudgetViewModel = hiltViewModel(),
-    aiInsightViewModel: AiInsightViewModel = hiltViewModel()
+    aiInsightViewModel: AiInsightViewModel = hiltViewModel(),
+    proactiveCoachViewModel: ProactiveCoachViewModel = hiltViewModel()
 ) {
     val currentUser by authViewModel.currentUser.collectAsState(initial = null)
     val transactionsState by transactionViewModel.transactionsState.collectAsState()
     val quickAddState by transactionViewModel.quickAddState.collectAsState()
     val habitualSuggestion by transactionViewModel.habitualSuggestion.collectAsState()
     val insightState by aiInsightViewModel.insightState.collectAsState()
+    val activeNudge by proactiveCoachViewModel.activeNudge.collectAsStateWithLifecycle()
+    val weeklyDigestState by proactiveCoachViewModel.digestState.collectAsStateWithLifecycle()
+    val isRefreshingDigest by proactiveCoachViewModel.isRefreshingDigest.collectAsStateWithLifecycle()
+    var showWeeklyDigestSheet by remember { mutableStateOf(false) }
+
+    LaunchedEffect(openWeeklyDigestOnStart) {
+        if (openWeeklyDigestOnStart) {
+            showWeeklyDigestSheet = true
+            proactiveCoachViewModel.loadWeeklyDigest(forceRefresh = false)
+            onConsumeWeeklyDigestFlag()
+        }
+    }
     var quickAddText by remember { mutableStateOf("") }
     val snackbarHostState = remember { SnackbarHostState() }
     val currentLanguage by authViewModel.currentLanguage.collectAsState()
@@ -121,6 +143,23 @@ fun DashboardScreen(
                     currencyCode = currencyCode
                 )
             }
+            // Phase 5.3: Dismissable Proactive AI Coach Nudge Banner
+            item {
+                activeNudge?.let { nudge ->
+                    ProactiveCoachBanner(
+                        nudge = nudge,
+                        onActionClick = {
+                            when (nudge.actionTarget) {
+                                NudgeActionTarget.OPEN_CHAT -> onNavigateToChat()
+                                NudgeActionTarget.OPEN_BUDGETS -> onNavigateToBudgets()
+                                NudgeActionTarget.ADD_TRANSACTION -> onNavigateToAddTransaction()
+                                NudgeActionTarget.OPEN_WEEKLY_DIGEST -> showWeeklyDigestSheet = true
+                            }
+                        },
+                        onDismissClick = { proactiveCoachViewModel.dismissNudge(nudge.id) }
+                    )
+                }
+            }
             item {
                 dailyVelocityReport?.let { report ->
                     if (report.isHighVelocity) {
@@ -154,7 +193,18 @@ fun DashboardScreen(
                 QuickActionsSection(
                     onNavigateToStatistics = onNavigateToStatistics,
                     onNavigateToCategories = onNavigateToCategories,
-                    onNavigateToChat = onNavigateToChat
+                    onNavigateToChat = onNavigateToChat,
+                    onNavigateToFinancialDna = onNavigateToFinancialDna
+                )
+            }
+
+            // Phase 5.3: Weekly AI Digest entry strip
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+                WeeklyDigestEntryCard(
+                    digestState = weeklyDigestState,
+                    currencyCode = currencyCode,
+                    onOpenClick = { showWeeklyDigestSheet = true }
                 )
             }
 
@@ -234,6 +284,20 @@ fun DashboardScreen(
 
             item { Spacer(modifier = Modifier.height(80.dp)) }
         }
+    }
+
+    if (showWeeklyDigestSheet) {
+        WeeklyDigestBottomSheet(
+            digestState = weeklyDigestState,
+            isRefreshing = isRefreshingDigest,
+            currencyCode = currencyCode,
+            onDismiss = { showWeeklyDigestSheet = false },
+            onRefreshClick = { proactiveCoachViewModel.loadWeeklyDigest(forceRefresh = true) },
+            onAskCoachClick = {
+                showWeeklyDigestSheet = false
+                onNavigateToChat()
+            }
+        )
     }
 }
 @Composable
@@ -563,7 +627,8 @@ fun FinanceIndicator(
 fun QuickActionsSection(
     onNavigateToStatistics: () -> Unit,
     onNavigateToCategories: () -> Unit,
-    onNavigateToChat: () -> Unit
+    onNavigateToChat: () -> Unit,
+    onNavigateToFinancialDna: () -> Unit = {}
 ) {
     Column(modifier = Modifier.padding(top = 16.dp)) {
         LazyRow(
@@ -573,6 +638,7 @@ fun QuickActionsSection(
             item { QuickActionItem(stringResource(R.string.action_category), Icons.Default.Category, Color(0xFFEF5350), onNavigateToCategories) }
             item { QuickActionItem(stringResource(R.string.nav_statistics), Icons.Default.BarChart, Color(0xFFFFA000), onNavigateToStatistics) }
             item { QuickActionItem(stringResource(R.string.action_chat), Icons.Default.SmartToy, Color(0xFF9C27B0), onNavigateToChat) }
+            item { QuickActionItem(stringResource(R.string.financial_dna_short), Icons.Default.Fingerprint, Color(0xFF00796B), onNavigateToFinancialDna) }
         }
     }
 }

@@ -5,7 +5,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
+import com.example.moneymanager.data.local.AnomalyPreferences
 import com.example.moneymanager.domain.model.Transaction
+import com.example.moneymanager.domain.model.TransactionAnomaly
+import com.example.moneymanager.domain.repository.SettingsRepository
+import com.example.moneymanager.domain.usecase.ai.DetectTransactionAnomalyUseCase
 import com.example.moneymanager.domain.usecase.ai.PredictCategoryUseCase
 import com.example.moneymanager.domain.usecase.transaction.AddTransactionUseCase
 import com.example.moneymanager.domain.usecase.transaction.ClearTransactionCacheUseCase
@@ -25,16 +29,21 @@ import com.example.moneymanager.util.PromptUtils
 import com.example.moneymanager.util.toCurrencyString
 import com.google.gson.Gson
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import java.time.LocalDate
@@ -78,10 +87,37 @@ class TransactionViewModel @Inject constructor(
     private val clearTransactionCacheUseCase: ClearTransactionCacheUseCase,
     private val aiServiceRepository: AiServiceRepository,
     private val exportTransactionsUseCase: com.example.moneymanager.domain.usecase.export.ExportTransactionsUseCase,
-    private val syncDataUseCase: com.example.moneymanager.domain.usecase.sync.SyncDataUseCase
+    private val syncDataUseCase: com.example.moneymanager.domain.usecase.sync.SyncDataUseCase,
+    private val detectTransactionAnomalyUseCase: DetectTransactionAnomalyUseCase,
+    private val anomalyPreferences: AnomalyPreferences,
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
 
     val syncState: StateFlow<com.example.moneymanager.domain.repository.SyncState> = syncDataUseCase.syncState
+
+    // --- Phase 5.2: Anomaly Detective ---
+    val anomalies: StateFlow<Map<String, TransactionAnomaly>> = combine(
+        getAllTransactionsUseCase().catch { emit(emptyList()) },
+        anomalyPreferences.dismissedIds,
+        settingsRepository.currentLanguage
+    ) { allTxs, dismissedIds, languageCode ->
+        val currencyCode = if (languageCode == "vi") "VND" else "USD"
+        detectTransactionAnomalyUseCase(
+            allTransactions = allTxs,
+            dismissedIds = dismissedIds,
+            currencyCode = currencyCode
+        )
+    }
+        .flowOn(Dispatchers.Default)
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = emptyMap()
+        )
+
+    fun dismissAnomaly(transactionId: String) {
+        anomalyPreferences.dismiss(transactionId)
+    }
 
     fun triggerSync() {
         viewModelScope.launch {

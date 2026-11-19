@@ -51,6 +51,7 @@ import com.example.moneymanager.ui.screens.auth.AuthScreen
 import com.example.moneymanager.ui.screens.budget.BudgetScreen
 import com.example.moneymanager.ui.screens.category.CategoriesScreen
 import com.example.moneymanager.ui.screens.dashboard.DashboardScreen
+import com.example.moneymanager.ui.screens.dna.FinancialDNAScreen
 import com.example.moneymanager.ui.screens.profile.ProfileScreen
 import com.example.moneymanager.ui.screens.statistics.StatisticsScreen
 import com.example.moneymanager.ui.screens.transaction.AddEditTransactionScreen
@@ -67,7 +68,9 @@ import com.example.moneymanager.R
 @Composable
 fun MainContainer(
     navController: NavHostController,
-    authViewModel: AuthViewModel = hiltViewModel()
+    authViewModel: AuthViewModel = hiltViewModel(),
+    openWeeklyDigestOnStart: Boolean = false,
+    onConsumeWeeklyDigestFlag: () -> Unit = {}
 ) {
     val isAuthenticated by authViewModel.isAuthenticated.collectAsState(initial = false)
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -180,13 +183,17 @@ fun MainContainer(
             NavGraph(
                 navController = navController,
                 authViewModel = authViewModel,
+                openWeeklyDigestOnStart = openWeeklyDigestOnStart,
+                onConsumeWeeklyDigestFlag = onConsumeWeeklyDigestFlag,
                 modifier = Modifier.padding(paddingValues)
             )
         }
     } else {
         NavGraph(
             navController = navController,
-            authViewModel = authViewModel
+            authViewModel = authViewModel,
+            openWeeklyDigestOnStart = openWeeklyDigestOnStart,
+            onConsumeWeeklyDigestFlag = onConsumeWeeklyDigestFlag
         )
     }
 }
@@ -229,6 +236,8 @@ fun RowScope.NavBarItem(
 fun NavGraph(
     navController: NavHostController,
     authViewModel: AuthViewModel = hiltViewModel(),
+    openWeeklyDigestOnStart: Boolean = false,
+    onConsumeWeeklyDigestFlag: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val isAuthenticated by authViewModel.isAuthenticated.collectAsState(initial = false)
@@ -274,7 +283,10 @@ fun NavGraph(
                 },
                 onNavigateToStatistics = { navController.navigate(Screen.Statistics.route)},
                 onNavigateToBudgets = { navController.navigate(Screen.Budgets.route) },
-                onNavigateToChat = { navController.navigate(Screen.Chat.route) }
+                onNavigateToChat = { navController.navigate(Screen.Chat.route) },
+                onNavigateToFinancialDna = { navController.navigate(Screen.FinancialDna.route) },
+                openWeeklyDigestOnStart = openWeeklyDigestOnStart,
+                onConsumeWeeklyDigestFlag = onConsumeWeeklyDigestFlag
             )
         }
 
@@ -336,7 +348,15 @@ fun NavGraph(
                         popUpTo(0) { inclusive = true }
                     }
                 },
-                onNavigateToBudgets = { navController.navigate(Screen.Budgets.route) }
+                onNavigateToBudgets = { navController.navigate(Screen.Budgets.route) },
+                onNavigateToFinancialDna = { navController.navigate(Screen.FinancialDna.route) }
+            )
+        }
+
+        composable(Screen.FinancialDna.route) {
+            FinancialDNAScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToAddTransaction = { navController.navigate(Screen.AddTransaction.route) }
             )
         }
 
