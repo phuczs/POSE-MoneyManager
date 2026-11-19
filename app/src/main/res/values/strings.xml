@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Money Manager</string>
+    <!-- Fallback default_web_client_id for builds/CI when google-services.json has no Web Client OAuth -->
+    <string name="default_web_client_id" translatable="false">dummy_default_web_client_id</string>
     <string name="nav_home">Home</string>
     <string name="nav_transactions">Transactions</string>
     <string name="nav_budgets">Budgets</string>

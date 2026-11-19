@@ -55,7 +55,12 @@ jobs:
                     "package_name": "pose.moneymanager"
                   }
                 },
-                "oauth_client": [],
+                "oauth_client": [
+                  {
+                    "client_id": "dummy_web_client_id_for_ci.apps.googleusercontent.com",
+                    "client_type": 3
+                  }
+                ],
                 "api_key": [
                   {
                     "current_key": "dummy_api_key_for_ci_build"
@@ -143,7 +148,12 @@ jobs:
                     "package_name": "pose.moneymanager"
                   }
                 },
-                "oauth_client": [],
+                "oauth_client": [
+                  {
+                    "client_id": "dummy_web_client_id_for_ci.apps.googleusercontent.com",
+                    "client_type": 3
+                  }
+                ],
                 "api_key": [{ "current_key": "dummy_key" }],
                 "services": {}
               }

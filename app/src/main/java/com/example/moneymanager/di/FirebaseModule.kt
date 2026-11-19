@@ -41,16 +41,26 @@ object FirebaseModule {
     @Provides
     @Singleton
     fun provideGoogleSignInClient(@ApplicationContext context: Context): GoogleSignInClient {
-        val gso = try {
-            GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                .requestIdToken(context.getString(com.example.moneymanager.R.string.default_web_client_id))
-                .requestEmail()
-                .build()
-        } catch (e: Exception) {
-            GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                .requestEmail()
-                .build()
+        val resId = context.resources.getIdentifier("default_web_client_id", "string", context.packageName)
+        val webClientId = if (resId != 0) {
+            try {
+                context.getString(resId)
+            } catch (e: Exception) {
+                ""
+            }
+        } else {
+            ""
         }
+
+        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestEmail()
+            .apply {
+                if (webClientId.isNotBlank()) {
+                    requestIdToken(webClientId)
+                }
+            }
+            .build()
+
         return GoogleSignIn.getClient(context, gso)
     }
 
