@@ -22,15 +22,18 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         val properties = Properties()
-        properties.load(project.rootProject.file("local.properties").inputStream())
-        val apiKey = properties.getProperty("apiKey") ?: ""
+        val localPropertiesFile = project.rootProject.file("local.properties")
+        if (localPropertiesFile.exists()) {
+            localPropertiesFile.inputStream().use { properties.load(it) }
+        }
+        val apiKey = properties.getProperty("apiKey") ?: System.getenv("API_KEY") ?: ""
 
         // Tạo biến BuildConfig.apiKey để dùng trong code Kotlin
         buildConfigField("String", "apiKey", "\"$apiKey\"")
 
         // Gemini API Key — stored in local.properties (git-ignored), NEVER hardcode here.
         // To use: add 'geminiApiKey=AIza...' to local.properties
-        val geminiApiKey = properties.getProperty("geminiApiKey") ?: ""
+        val geminiApiKey = properties.getProperty("geminiApiKey") ?: System.getenv("GEMINI_API_KEY") ?: ""
         buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
 
     }
