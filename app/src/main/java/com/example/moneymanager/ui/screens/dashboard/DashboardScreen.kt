@@ -43,6 +43,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.moneymanager.domain.model.NudgeActionTarget
 import com.example.moneymanager.domain.model.Transaction
 import com.example.moneymanager.ui.screens.dashboard.components.ProactiveCoachBanner
+import com.example.moneymanager.ui.screens.dashboard.components.SavingsChallengeCard
+import com.example.moneymanager.ui.screens.dashboard.components.SubscriptionDetectorBottomSheet
+import com.example.moneymanager.ui.screens.dashboard.components.SubscriptionHunterBanner
 import com.example.moneymanager.ui.screens.dashboard.components.WeeklyDigestBottomSheet
 import com.example.moneymanager.ui.screens.dashboard.components.WeeklyDigestEntryCard
 import com.example.moneymanager.ui.theme.BackgroundGray
@@ -54,6 +57,7 @@ import com.example.moneymanager.ui.viewmodel.BudgetViewModel
 import com.example.moneymanager.ui.viewmodel.AiInsightViewModel
 import com.example.moneymanager.ui.viewmodel.InsightUiState
 import com.example.moneymanager.ui.viewmodel.ProactiveCoachViewModel
+import com.example.moneymanager.ui.viewmodel.SavingsAndSubscriptionViewModel
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.AutoAwesome
 import com.example.moneymanager.ui.viewmodel.AuthViewModel
@@ -81,7 +85,8 @@ fun DashboardScreen(
     transactionViewModel: TransactionViewModel = hiltViewModel(),
     budgetViewModel: BudgetViewModel = hiltViewModel(),
     aiInsightViewModel: AiInsightViewModel = hiltViewModel(),
-    proactiveCoachViewModel: ProactiveCoachViewModel = hiltViewModel()
+    proactiveCoachViewModel: ProactiveCoachViewModel = hiltViewModel(),
+    savingsAndSubscriptionViewModel: SavingsAndSubscriptionViewModel = hiltViewModel()
 ) {
     val currentUser by authViewModel.currentUser.collectAsState(initial = null)
     val transactionsState by transactionViewModel.transactionsState.collectAsState()
@@ -93,6 +98,27 @@ fun DashboardScreen(
     val isRefreshingDigest by proactiveCoachViewModel.isRefreshingDigest.collectAsStateWithLifecycle()
     var showWeeklyDigestSheet by remember { mutableStateOf(false) }
 
+    val activeChallenge by savingsAndSubscriptionViewModel.activeChallenge.collectAsStateWithLifecycle()
+    val suggestedChallenges by savingsAndSubscriptionViewModel.suggestedChallenges.collectAsStateWithLifecycle()
+    val detectedSubscriptions by savingsAndSubscriptionViewModel.detectedSubscriptions.collectAsStateWithLifecycle()
+    val actionMessage by savingsAndSubscriptionViewModel.actionMessage.collectAsStateWithLifecycle()
+    var showSubscriptionSheet by remember { mutableStateOf(false) }
+    var quickAddText by remember { mutableStateOf("") }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(currentUser) {
+        currentUser?.id?.let { uid ->
+            savingsAndSubscriptionViewModel.loadData(uid)
+        }
+    }
+
+    LaunchedEffect(actionMessage) {
+        actionMessage?.let { msg ->
+            snackbarHostState.showSnackbar(msg)
+            savingsAndSubscriptionViewModel.clearActionMessage()
+        }
+    }
+
     LaunchedEffect(openWeeklyDigestOnStart) {
         if (openWeeklyDigestOnStart) {
             showWeeklyDigestSheet = true
@@ -100,8 +126,6 @@ fun DashboardScreen(
             onConsumeWeeklyDigestFlag()
         }
     }
-    var quickAddText by remember { mutableStateOf("") }
-    val snackbarHostState = remember { SnackbarHostState() }
     val currentLanguage by authViewModel.currentLanguage.collectAsState()
     val dashboardWidgetsOrder by authViewModel.dashboardWidgetsOrder.collectAsState()
     val dailyVelocityReport by budgetViewModel.dailyVelocityReport.collectAsState()
@@ -208,6 +232,30 @@ fun DashboardScreen(
                 )
             }
 
+            // Phase 5.4: Gamified Savings Challenge Card
+            item {
+                SavingsChallengeCard(
+                    activeChallenge = activeChallenge,
+                    suggestedChallenges = suggestedChallenges,
+                    currencyCode = currencyCode,
+                    onAcceptChallenge = { challenge ->
+                        savingsAndSubscriptionViewModel.acceptChallenge(challenge)
+                    },
+                    onAbandonChallenge = { id ->
+                        savingsAndSubscriptionViewModel.abandonChallenge(id)
+                    }
+                )
+            }
+
+            // Phase 5.4: Smart Subscription Hunter Banner
+            item {
+                SubscriptionHunterBanner(
+                    subscriptions = detectedSubscriptions,
+                    currencyCode = currencyCode,
+                    onClick = { showSubscriptionSheet = true }
+                )
+            }
+
             // Settings-driven Dynamic Widgets
             dashboardWidgetsOrder.forEach { widgetKey ->
                 when (widgetKey) {
@@ -297,6 +345,19 @@ fun DashboardScreen(
                 showWeeklyDigestSheet = false
                 onNavigateToChat()
             }
+        )
+    }
+
+    if (showSubscriptionSheet) {
+        SubscriptionDetectorBottomSheet(
+            subscriptions = detectedSubscriptions,
+            currencyCode = currencyCode,
+            onConvertToRecurring = { sub ->
+                currentUser?.id?.let { uid ->
+                    savingsAndSubscriptionViewModel.convertSubscriptionToRecurring(sub, uid)
+                }
+            },
+            onDismiss = { showSubscriptionSheet = false }
         )
     }
 }
